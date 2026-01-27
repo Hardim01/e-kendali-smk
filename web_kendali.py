@@ -11,38 +11,19 @@ st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    .headline {
-        text-align: center; color: #ffc107; font-size: 2.5em; font-weight: bold;
-        margin-bottom: 0px; text-shadow: 2px 2px #000;
-    }
+    .headline { text-align: center; color: #ffc107; font-size: 2.5em; font-weight: bold; text-shadow: 2px 2px #000; }
     .digital-clock { 
         font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3.2em; 
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 10px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
-    .running-text {
-        background-color: #ffc107; color: #000; padding: 10px; font-weight: bold;
-        border-radius: 5px; margin: 20px 0; font-size: 1.1em;
-    }
-    div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
-    
-    /* Footer Tengah & Logo Ruas */
-    .footer-container {
-        text-align: center;
-        margin-top: 60px;
-        padding: 20px;
-        border-top: 1px solid #333;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-    }
-    .dev-text { color: #888; font-size: 0.9rem; font-weight: bold; margin-top: 10px; }
+    .running-text { background-color: #ffc107; color: #000; padding: 10px; font-weight: bold; border-radius: 5px; margin: 20px 0; font-size: 1.1em; }
+    div[data-testid="stForm"] { border: 2px solid #ffc107 !important; border-radius: 15px; padding: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE & UPLOAD ENGINE
+# 2. DATABASE ENGINE
 # ==========================================
 DB_DIR = "database"
 UPLOAD_DIR = "uploads"
@@ -53,8 +34,6 @@ def load_db(name):
     p = os.path.join(DB_DIR, name)
     if os.path.exists(p):
         df = pd.read_csv(p)
-        mapping = {'Jam': 'Time', 'Aktivitas': 'Activity', 'Staf': 'Staff', 'Sumber': 'Source', 'User': 'PIC', 'Isi': 'Message', 'Lampiran': 'Attachment'}
-        df = df.rename(columns=mapping)
         if name == "kas.csv" and not df.empty:
             df['Masuk'] = pd.to_numeric(df['Masuk'], errors='coerce').fillna(0)
             df['Keluar'] = pd.to_numeric(df['Keluar'], errors='coerce').fillna(0)
@@ -64,7 +43,6 @@ def load_db(name):
 def save_db(df, name):
     df.to_csv(os.path.join(DB_DIR, name), index=False)
 
-# --- LOGIN SESSION ---
 if "logged_in" not in st.session_state:
     st.session_state.update({
         "logged_in": False, "user_role": None, 
@@ -76,46 +54,58 @@ if "logged_in" not in st.session_state:
 
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
-# Header Headline & Logo SMK Tengah
+# Header & Logo
 st.markdown('<h1 class="headline">SISTEM KENDALI SMK NASIONAL BANDUNG</h1>', unsafe_allow_html=True)
 _, mid_logo_smk, _ = st.columns([1, 0.3, 1])
 with mid_logo_smk: st.image("logo_smk.png", use_container_width=True)
 
-# Running Text
 st.markdown(f"""<div class="running-text"><marquee scrollamount="10">Kieu Bisa, Kitu Bisa, Sagala Bisa... Pekerjaan Memang Penting Tapi Sholat Yang Utama!</marquee></div>""", unsafe_allow_html=True)
 
 if not st.session_state.logged_in:
-    with st.form("login"):
-        u = st.selectbox("Pilih Posisi", list(st.session_state.users.keys()))
-        p = st.text_input("Password", type="password")
-        if st.form_submit_button("MASUK SISTEM"):
-            if p == st.session_state.users[u]: 
-                st.session_state.logged_in = True; st.session_state.user_role = u; st.rerun()
-            else: st.error("Akses Ditolak!")
+    _, l_col, _ = st.columns([1, 0.4, 1])
+    with l_col:
+        with st.form("login"):
+            u = st.selectbox("Pilih Posisi", list(st.session_state.users.keys()))
+            p = st.text_input("Password", type="password")
+            if st.form_submit_button("MASUK SISTEM"):
+                if p == st.session_state.users[u]: 
+                    st.session_state.logged_in = True; st.session_state.user_role = u; st.rerun()
+                else: st.error("Akses Ditolak!")
     st.stop()
 
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. KONTEN DASHBOARD
+# 3. LOGIKA DASHBOARD
 # ==========================================
 list_sumber = ["BOS", "SPP", "PIP", "RMP", "Sumbangan", "Lain-lain"]
 
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
-    t1, t2, t3 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUKSI KEPSEK", "💰 KEUANGAN"])
+    t1, t2, t3 = st.tabs(["🎥 MONITOR REAL-TIME", "✍️ BERI INSTRUKSI", "💰 KEUANGAN"])
+    
     with t1:
+        st.subheader("📋 Laporan Kerja Harian Staf")
         st.dataframe(load_db("monitor.csv")[::-1], use_container_width=True)
+        st.divider()
+        st.subheader("✅ Pelaksanaan Instruksi (Progres)")
+        st.dataframe(load_db("respon_instruksi.csv")[::-1], use_container_width=True)
+
     with t2:
+        st.subheader("Kirim Instruksi Baru")
         target = st.multiselect("Target Staf:", list(st.session_state.users.keys()))
-        msg = st.text_area("Instruksi:")
-        f_ins = st.file_uploader("Lampiran (PDF/Word/JPG/Video):", type=['pdf','docx','jpg','png','mp4'], key="ins")
-        if st.button("Kirim Instruksi"):
+        msg = st.text_area("Isi Instruksi:")
+        f_ins = st.file_uploader("Lampiran (PDF/JPG/Video):", type=['pdf','docx','jpg','png','mp4'], key="ins_kepsek")
+        if st.button("Kirim Sekarang"):
             fn = f_ins.name if f_ins else "-"
             if f_ins:
                 with open(os.path.join(UPLOAD_DIR, f_ins.name), "wb") as f: f.write(f_ins.getbuffer())
             df_i = load_db("instruksi.csv")
-            save_db(pd.concat([df_i, pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg, "Attachment": fn}])], ignore_index=True), "instruksi.csv"); st.rerun()
+            new_i = pd.DataFrame([{"Jam": waktu_wib, "Target": str(target), "Pesan": msg, "File": fn}])
+            save_db(pd.concat([df_i, new_i], ignore_index=True), "instruksi.csv"); st.success("Instruksi Terkirim!"); st.rerun()
+        st.divider()
+        st.write("Riwayat Instruksi:")
         st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
+
     with t3:
         df_k = load_db("kas.csv")
         if not df_k.empty:
@@ -127,19 +117,49 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
             st.dataframe(df_k[::-1], use_container_width=True)
 
 else:
-    menu = ["📝 LAPOR KERJA", "🔔 INSTRUKSI"]
+    # --- DASHBOARD STAF ---
+    menu = ["📝 LAPOR KERJA HARIAN", "🔔 INSTRUKSI & PELAKSANAAN"]
     if "Bendahara" in st.session_state.user_role: menu.insert(1, "💰 INPUT KAS")
     tabs = st.tabs(menu)
+    
     with tabs[0]:
-        akt = st.text_area("Laporan Kerja:")
-        f_lapor = st.file_uploader("Lampirkan Bukti (Gambar/Doc/Video):", type=['pdf','docx','jpg','png','mp4'], key="lapor")
-        if st.button("Simpan Laporan"):
-            fn = f_lapor.name if f_lapor else "-"
-            if f_lapor:
-                with open(os.path.join(UPLOAD_DIR, f_lapor.name), "wb") as f: f.write(f_lapor.getbuffer())
+        st.subheader("Catat Kerja Harian")
+        akt = st.text_area("Apa yang Anda kerjakan hari ini?")
+        f_l = st.file_uploader("Upload Bukti (jika ada):", type=['pdf','docx','jpg','png','mp4'], key="lapor_staf")
+        if st.button("Kirim Laporan Harian"):
+            fn = f_l.name if f_l else "-"
+            if f_l:
+                with open(os.path.join(UPLOAD_DIR, f_l.name), "wb") as f: f.write(f_l.getbuffer())
             df_m = load_db("monitor.csv")
-            save_db(pd.concat([df_m, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt, "Attachment": fn}])], ignore_index=True), "monitor.csv"); st.rerun()
-        st.divider(); st.dataframe(load_db("monitor.csv")[load_db("monitor.csv")['Staff'] == st.session_state.user_role][::-1], use_container_width=True)
+            new_m = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Aktivitas": akt, "File": fn}])
+            save_db(pd.concat([df_m, new_m], ignore_index=True), "monitor.csv"); st.success("Laporan Terkirim!"); st.rerun()
+        st.divider()
+        st.write("Riwayat Laporan Saya:")
+        df_my = load_db("monitor.csv")
+        st.dataframe(df_my[df_my['Staf'] == st.session_state.user_role][::-1], use_container_width=True)
+
+    with tabs[-1]:
+        st.subheader("🔔 Kotak Masuk Instruksi")
+        df_ins = load_db("instruksi.csv")
+        if not df_ins.empty:
+            for i, r in df_ins.iterrows():
+                if st.session_state.user_role in str(r.get('Target', '')):
+                    with st.expander(f"🔴 INSTRUKSI: {r['Jam']}"):
+                        st.write(f"**Pesan:** {r['Pesan']}")
+                        st.write(f"📎 **File:** {r['File']}")
+                        st.divider()
+                        st.write("**Laksanakan Instruksi Ini:**")
+                        with st.form(f"form_res_{i}"):
+                            res_msg = st.text_area("Laporan Pelaksanaan:")
+                            res_file = st.file_uploader("Upload Bukti Pelaksanaan:", type=['pdf','docx','jpg','png','mp4'])
+                            if st.form_submit_button("Kirim Progres Ke Kepsek"):
+                                r_fn = res_file.name if res_file else "-"
+                                if res_file:
+                                    with open(os.path.join(UPLOAD_DIR, res_file.name), "wb") as f: f.write(res_file.getbuffer())
+                                df_res = load_db("respon_instruksi.csv")
+                                new_res = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Tugas_Dari": r['Jam'], "Hasil": res_msg, "File_Bukti": r_fn}])
+                                save_db(pd.concat([df_res, new_res], ignore_index=True), "respon_instruksi.csv")
+                                st.success("Pelaksanaan Berhasil Dilaporkan!"); st.rerun()
 
     if "Bendahara" in st.session_state.user_role:
         with tabs[1]:
@@ -156,15 +176,8 @@ else:
                     v_cols[j % 3].info(f"**{smb}:** Rp {val['Masuk'].sum() - val['Keluar'].sum():,}")
                 st.dataframe(df_v[::-1], use_container_width=True)
 
-    with tabs[-1]:
-        df_ins = load_db("instruksi.csv")
-        if not df_ins.empty:
-            for _, r in df_ins.iterrows():
-                if st.session_state.user_role in str(r.get('Target', '')):
-                    st.warning(f"**[{r.get('Time', 'N/A')}]** {r.get('Message', 'No Message')} \n\n 📎 Lampiran: {r.get('Attachment', '-')}")
-
 # ==========================================
-# 4. PASSWORD & FOOTER (LOGO RUAS CENTERED)
+# 4. FOOTER (TENGAH & LOGO RUAS)
 # ==========================================
 st.divider()
 c1, c2 = st.columns(2)
@@ -175,9 +188,8 @@ with c2:
         new_pw = st.text_input("Baru:", type="password")
         if st.button("Update"): st.session_state.users[st.session_state.user_role] = new_pw; st.success("OK")
 
-# FOOTER DENGAN LOGO RUAS DI TENGAH
 st.markdown("---")
 _, mid_footer, _ = st.columns([1, 0.4, 1])
 with mid_footer:
-    st.image("logo_ruas.png", use_container_width=True) # Pastikan file logo_ruas.png ada di folder aplikasi
+    st.image("logo_ruas.png", use_container_width=True)
     st.markdown('<p style="text-align:center; color:#888; font-weight:bold; font-size:0.9rem;">Developed by Hardianto | Powered by RUAS STUDIO</p>', unsafe_allow_html=True)
