@@ -7,7 +7,7 @@ import ast
 import time 
 
 # ==========================================
-# 1. STYLE & KONFIGURASI
+# 1. STYLE & KONFIGURASI (SIMETRIS)
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide", page_icon="🏛️")
 
@@ -17,9 +17,10 @@ st.markdown("""
     .marquee-container { background-color: #002b5b; color: #ffffff; padding: 12px 0; font-weight: bold; border-bottom: 4px solid #ffc107; margin-bottom: 25px; overflow: hidden; white-space: nowrap; }
     .marquee-text { display: inline-block; padding-left: 100%; animation: marquee 20s linear infinite; font-size: 1.2rem; }
     @keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
-    .digital-clock-main { font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3em; font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 15px; padding: 10px; }
+    .digital-clock-main { font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3.2em; font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 15px; padding: 10px; margin: 0px; }
     .welcome-text-gold { color: #ffc107; font-weight: bold; font-size: 1.8rem; text-align: center; text-shadow: 2px 2px 4px #000; }
     .btn-download { background-color: #ffc107; color: black !important; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px; }
+    .logo-container { display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -48,7 +49,7 @@ def get_download_link(df, filename):
     return f'<a href="data:file/csv;base64,{b64}" download="{filename}" class="btn-download">📥 DOWNLOAD DATA ({filename})</a>'
 
 # ==========================================
-# 3. AKSES & LOGIN (WAKTU WIB +7)
+# 3. AKSES & LOGIN
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.update({
@@ -60,16 +61,18 @@ if "logged_in" not in st.session_state:
         "tugas_khusus": load_data("database_tugas.csv")
     })
 
-# SETTING WAKTU KE WIB (UTC+7)
 waktu_skrg = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
-
 teks_marquee = '<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>'
 
 if not st.session_state.logged_in:
     st.markdown(teks_marquee, unsafe_allow_html=True)
     _, col_log, _ = st.columns([1, 1, 1])
     with col_log:
-        st.markdown('<p class="welcome-text-gold">E-KENDALI SMK NASIONAL</p>', unsafe_allow_html=True)
+        st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+        try: st.image("logo_smk.png", width=120)
+        except: st.markdown("🏛️")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<p class="welcome-text-gold">E-KENDALI LOGIN</p>', unsafe_allow_html=True)
         jab = st.selectbox("Pilih Jabatan:", ["--- Pilih ---"] + list(st.session_state.users.keys()))
         pw = st.text_input("Password:", type="password")
         if st.button("MASUK SISTEM", use_container_width=True):
@@ -79,25 +82,33 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 4. HEADER (LOGO & JAM WIB)
+# 4. HEADER (SIMETRIS: LOGO - JAM - LOGO)
 # ==========================================
 st.markdown(teks_marquee, unsafe_allow_html=True)
+# Menggunakan col standar dengan alignment center
 c1, c2, c3 = st.columns([1, 2, 1])
+
 with c1:
-    try: st.image("logo_smk.png", width=80)
+    st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+    try: st.image("logo_smk.png", width=90)
     except: st.markdown("🏛️ **SMK NASIONAL**")
-    st.info(f"User: {st.session_state.user_role}")
+    st.info(f"Role: {st.session_state.user_role}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
 with c2:
     st.markdown(f"<h2 class='digital-clock-main'>{waktu_skrg}</h2>", unsafe_allow_html=True)
+
 with c3:
-    try: st.image("logo_ruas.png", width=60)
+    st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+    try: st.image("logo_ruas.png", width=75)
     except: st.markdown("🚀 **RUAS STUDIO**")
     if st.button("🚪 KELUAR", use_container_width=True):
         st.session_state.logged_in = False; st.rerun()
     with st.expander("🔑 Ganti PW"):
-        npw = st.text_input("Password Baru:", type="password")
+        npw = st.text_input("Baru:", type="password")
         if st.button("Update"):
             st.session_state.users[st.session_state.user_role] = npw; st.success("Ok!"); st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
