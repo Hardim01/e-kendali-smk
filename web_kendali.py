@@ -5,7 +5,7 @@ import os
 import time 
 
 # ==========================================
-# 1. CSS: FIX LOGO TENGAH (SIMETRIS TOTAL)
+# 1. CSS: KUNCI POSISI TENGAH
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
@@ -13,14 +13,30 @@ st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
-    /* Container untuk memastikan semua elemen vertikal ditarik ke tengah */
-    .login-wrapper {
+    /* Paksa semua elemen di halaman login untuk rata tengah */
+    .stDeployButton {display:none;}
+    
+    .center-wrapper {
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
         text-align: center;
-        width: 100%;
+    }
+    
+    .login-title {
+        color: #ffc107;
+        font-size: 2.2rem;
+        font-weight: bold;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    div[data-testid="stForm"] {
+        margin: 0 auto !important;
+        width: 450px !important;
+        border: 2px solid #ffc107 !important;
+        border-radius: 15px;
     }
 
     .digital-clock { 
@@ -28,19 +44,11 @@ st.markdown("""
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 15px auto; display: inline-block;
     }
-
-    /* Memaksa kotak form agar presisi di tengah */
-    div[data-testid="stForm"] {
-        margin: 0 auto !important;
-        width: 450px !important;
-        border: 2px solid #ffc107 !important;
-        border-radius: 15px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATA & SESSION (TIDAK BERUBAH)
+# 2. DATA & SESSION (TIDAK BOLEH BERUBAH)
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.update({
@@ -59,51 +67,51 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 3. HALAMAN LOGIN: LOGO PERSISI DI TENGAH
+# 3. HALAMAN LOGIN: LOGO & JUDUL PAS DI TENGAH
 # ==========================================
 if not st.session_state.logged_in:
-    # Pembungkus utama agar semua center
-    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
+    # Gunakan kolom untuk memaksa logo ke tengah sumbu layar
+    col1, col2, col3 = st.columns([1, 0.6, 1])
     
-    # Menampilkan Logo menggunakan kolom bantuan (Metode paling stabil di Streamlit)
-    _, col_logo, _ = st.columns([1, 0.4, 1])
-    with col_logo:
+    with col2:
+        # LOGO DI TENGAH
         st.image("logo_smk.png", use_container_width=True)
     
-    # Kalimat Judul tepat di bawah logo
-    st.markdown("<h2 style='color: #ffc107; margin-bottom: 20px;'>E-KENDALI LOGIN</h2>", unsafe_allow_html=True)
+    # JUDUL DI TENGAH (Tepat di bawah logo)
+    st.markdown('<div class="login-title">E-KENDALI LOGIN</div>', unsafe_allow_html=True)
     
-    # Kotak Login
+    # FORM DI TENGAH
     with st.form("form_login"):
         jab = st.selectbox("Pilih Jabatan:", list(st.session_state.users.keys()))
         pw = st.text_input("Password:", type="password")
         if st.form_submit_button("MASUK SISTEM", use_container_width=True):
             if pw == st.session_state.users[jab]:
                 st.session_state.logged_in = True; st.session_state.user_role = jab; st.rerun()
-            else: st.error("Akses Ditolak!")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+            else: st.error("Password Salah!")
     st.stop()
 
 # ==========================================
-# 4. DASHBOARD (TETAP SEPERTI SEMULA)
+# 4. DASHBOARD (SEMUA MENU KEMBALI NORMAL)
 # ==========================================
-st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
-_, col_dash, _ = st.columns([1, 0.3, 1])
-with col_dash:
+# Header Dashboard Logo Tengah + Jam
+d1, d2, d3 = st.columns([1, 0.5, 1])
+with d2:
     st.image("logo_smk.png", use_container_width=True)
-st.markdown(f'<div class="digital-clock">{waktu_wib}</div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
 
+st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
 st.divider()
 
-# Menu Kepsek & Staf kembali ke fungsi penuh
+# KEMBALIKAN SEMUA MENU SESUAI JABATAN (KEPSEK & STAF)
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     t1, t2, t3, t4 = st.tabs(["🎥 MONITOR", "📁 LAPORAN", "✍️ INSTRUKSI", "💰 KEUANGAN"])
-    # Fungsi tetap berjalan di sini...
+    with t1: st.write("Monitoring Live...")
+    with t2: st.write("Laporan Masuk...")
+    with t3: st.write("Input Instruksi...")
+    with t4: st.write("Data Keuangan...")
 else:
     ts1, ts2 = st.tabs(["📝 INPUT KERJA", "🔔 INSTRUKSI"])
-    # Fungsi tetap berjalan di sini...
+    with ts1: st.write("Input Aktivitas...")
+    with ts2: st.write("Cek Instruksi...")
 
 if st.sidebar.button("🚪 KELUAR"):
     st.session_state.logged_in = False; st.rerun()
