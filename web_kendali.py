@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import base64
 import ast
+import time 
 
 # ==========================================
 # 1. PAGE & CSS CONFIG
@@ -107,7 +108,7 @@ if "logged_in" not in st.session_state:
 current_time = datetime.now().strftime("%H:%M:%S")
 
 # ==========================================
-# 4. LOGIN INTERFACE
+# 4. LOGIN INTERFACE (BERSIH TOTAL)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Pekerjaan memang penting tapi Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
@@ -116,27 +117,31 @@ if not st.session_state.logged_in:
     if logo_smk_b64:
         st.markdown(f'<div style="display: flex; justify-content: center; padding: 10px;"><img src="data:image/png;base64,{logo_smk_b64}" width="120"></div>', unsafe_allow_html=True)
     st.markdown('<p class="school-text-gold">SMK Nasional Bandung</p>', unsafe_allow_html=True)
+    
     _, col_login, _ = st.columns([1, 0.8, 1])
     with col_login:
-        u = st.selectbox("Pilih Jabatan:", list(st.session_state.users.keys()))
-        p = st.text_input("Password:", type="password")
+        u = st.selectbox("Pilih Jabatan:", list(st.session_state.users.keys()), key="box_user")
+        # Mengubah label agar browser tidak memunculkan bayangan otomatis
+        p = st.text_input("Kode Akses:", type="password", key="kunci_masuk", placeholder="Ketik di sini...")
+        
         if st.button("MASUK SISTEM", use_container_width=True):
             if p == st.session_state.users[u]:
                 st.session_state.logged_in = True; st.session_state.user_role = u; st.rerun()
-            else: st.error("Password Salah!")
+            else: st.error("Kode Akses Salah!")
     st.stop()
 
 # ==========================================
-# 5. SIDEBAR
+# 5. SIDEBAR (JAM BERDETAK)
 # ==========================================
 with st.sidebar:
     logo_sidebar = get_base64_image("logo_smk.png")
     if logo_sidebar:
         st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{logo_sidebar}" width="80"></div>', unsafe_allow_html=True)
     st.success(f"Login: **{st.session_state.user_role}**")
+    
+    # Jam Digital
     st.markdown(f"<h2 class='digital-clock-main'>{current_time}</h2>", unsafe_allow_html=True)
     
-    # MENU MANDIRI: GANTI PASSWORD SENDIRI
     with st.expander("🔑 Ganti Password Saya"):
         new_pw = st.text_input("Password Baru:", type="password", key="self_pw")
         if st.button("Update Password Saya"):
@@ -146,12 +151,11 @@ with st.sidebar:
                 st.success("Berhasil Diganti!")
             else: st.warning("Isi password!")
 
-    # MENU ADMIN: RESET PASSWORD STAF (Hanya Muncul Jika Login Admin Sistem)
     if st.session_state.user_role == "ADMIN SISTEM":
         st.divider()
         with st.expander("🛠️ PANEL RESET PASSWORD (ADMIN)", expanded=True):
-            user_to_reset = st.selectbox("Pilih Staf:", list(st.session_state.users.keys()))
-            reset_pw = st.text_input("Password Baru Staf:", type="password", key="admin_pw")
+            user_to_reset = st.selectbox("Pilih Staf:", list(st.session_state.users.keys()), key="box_reset")
+            reset_pw = st.text_input("Password Baru Staf:", type="password", key="admin_reset_pw")
             if st.button("RESET PASSWORD STAF"):
                 if reset_pw:
                     st.session_state.users[user_to_reset] = reset_pw
@@ -167,9 +171,7 @@ with st.sidebar:
     if st.button("🚪 LOGOUT", use_container_width=True):
         st.session_state.logged_in = False; st.rerun()
 
-# ==========================================
-# 6. HITUNG SALDO KAS
-# ==========================================
+# --- SISA KODE DASHBOARD (TETAP SAMA) ---
 df_kas = pd.DataFrame(st.session_state.data_kas)
 if not df_kas.empty:
     m = pd.to_numeric(df_kas['Masuk'], errors='coerce').fillna(0)
@@ -178,14 +180,10 @@ if not df_kas.empty:
 else:
     total_saldo = 0
 
-# ==========================================
-# 7. MAIN DASHBOARD
-# ==========================================
 st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Pekerjaan memang penting tapi Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
 
 role = st.session_state.user_role
 
-# --- KEPALA SEKOLAH & ADMIN ---
 if role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     st.info(f"💰 **TOTAL SALDO KAS SAAT INI: Rp {total_saldo:,.0f}**")
     t1, t2, t3, t4 = st.tabs(["🎥 MONITOR LIVE", "📁 LAPORAN STAF", "✍️ INSTRUKSI", "💰 KEUANGAN"])
@@ -209,7 +207,6 @@ if role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         if st.session_state.tugas_khusus: st.dataframe(pd.DataFrame(st.session_state.tugas_khusus)[::-1], use_container_width=True)
     with t4: st.dataframe(df_kas[::-1], use_container_width=True)
 
-# --- BENDAHARA / STAF ---
 else:
     tasks = [t for t in st.session_state.tugas_khusus if t['Untuk'] == role]
     if tasks:
@@ -251,3 +248,8 @@ if st.session_state.logged_in:
     st.divider()
     if os.path.exists("kalender_akademik.png"): st.image("kalender_akademik.png", use_container_width=True)
 
+# ==========================================
+# 8. JANTUNG PENGGERAK JAM
+# ==========================================
+time.sleep(1)
+st.rerun()
