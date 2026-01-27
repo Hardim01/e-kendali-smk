@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 
 # ==========================================
-# 1. CSS: KREDIT TENGAH & STYLE TETAP
+# 1. CSS: FIX FOOTER PERSIS GAMBAR
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
@@ -18,16 +18,28 @@ st.markdown("""
     }
     div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
     
+    /* Style Footer Persis Gambar */
     .footer-section { 
-        display: flex; flex-direction: column; align-items: center; text-align: center;
-        margin-top: 50px; padding-top: 20px; border-top: 1px solid #333; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center;
+        text-align: center;
+        margin-top: 50px; 
+        padding-top: 20px; 
+        border-top: 1px solid #333; 
     }
-    .dev-text { color: #888; font-size: 0.75rem; letter-spacing: 1px; margin-top: 8px; font-weight: bold; }
+    .dev-text { 
+        color: #888; 
+        font-size: 0.8rem; 
+        margin-top: 10px; 
+        font-weight: 500;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE ENGINE (PENYELARAS KOLOM)
+# 2. DATABASE ENGINE
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -76,48 +88,45 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 4. HEADER (LOGO & JAM)
+# 4. DASHBOARD HEADER
 # ==========================================
 _, d_col, _ = st.columns([1, 0.3, 1])
 with d_col: st.image("logo_smk.png", use_container_width=True)
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 5. MAIN CONTENT (KEPSEK VS STAF)
+# 5. MAIN CONTENT
 # ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     t1, t2, t3, t4 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUCTION", "💰 FINANCE", "📚 ARCHIVE"])
     with t1:
-        st.subheader("Staff Daily Work Report")
         df_mon = load_db("monitor.csv")
         st.table(df_mon[::-1] if not df_mon.empty else pd.DataFrame(columns=["Time", "Staff", "Activity"]))
     with t2:
         target = st.multiselect("Select Staff:", list(st.session_state.users.keys()))
         msg = st.text_area("Task Detail:")
-        if st.button("Send Instruction"):
+        if st.button("Send Now"):
             df_ins = load_db("instruksi.csv")
             new_ins = pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg}])
             save_db(pd.concat([df_ins, new_ins], ignore_index=True), "instruksi.csv")
-            st.success("Instruction Sent!")
+            st.success("Sent!")
     with t3:
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
             st.metric("Balance", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
             st.dataframe(df_kas[::-1], use_container_width=True)
-    with t4:
-        st.write("Full Instruction History")
-        st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
+    with t4: st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
 
 else:
-    # VIEW STAF (LAPOR KERJA ADA LAGI!)
+    # STAFF VIEW (CATATAN HARIAN AKTIF)
     st1, st2, st3 = st.tabs(["📝 DAILY REPORT", "🔔 INSTRUCTIONS", "📚 MY HISTORY"])
     with st1:
         akt = st.text_area("What are you doing today?")
-        if st.button("Submit Report"):
+        if st.button("Submit Progress"):
             df_mon = load_db("monitor.csv")
             new_mon = pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])
             save_db(pd.concat([df_mon, new_mon], ignore_index=True), "monitor.csv")
-            st.success("Report Sent to Principal!")
+            st.success("Report Sent!")
     with st2:
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
@@ -127,29 +136,30 @@ else:
     with st3:
         df_all = load_db("monitor.csv")
         if not df_all.empty:
-            st.write("My Work History")
             st.dataframe(df_all[df_all['Staff'] == st.session_state.user_role][::-1], use_container_width=True)
 
 # ==========================================
-# 6. ACCOUNT SETTINGS (LOGOUT & PW)
+# 6. LOGOUT & CHANGE PW (POSISI TETAP)
 # ==========================================
-st.markdown("---")
-col_log1, col_log2 = st.columns(2)
-with col_log1:
-    if st.button("🚪 LOGOUT FROM SYSTEM", use_container_width=True):
+st.divider()
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("🚪 LOGOUT", use_container_width=True):
         st.session_state.logged_in = False; st.rerun()
-with col_log2:
+with c2:
     with st.expander("🔑 Change Password"):
-        n_pw = st.text_input("New Password:", type="password")
-        if st.button("Save Password"):
+        n_pw = st.text_input("New PW:", type="password")
+        if st.button("Save"):
             st.session_state.users[st.session_state.user_role] = n_pw
             st.success("Saved!")
 
 # ==========================================
-# 7. FOOTER (TENGAH)
+# 7. FOOTER (PERSIS GAMBAR CONTOH)
 # ==========================================
 st.markdown('<div class="footer-section">', unsafe_allow_html=True)
-_, f_logo, _ = st.columns([1, 0.1, 1])
-with f_logo:
+# Menempatkan logo di kolom tengah agar simetris
+_, mid_logo, _ = st.columns([1, 0.1, 1])
+with mid_logo:
     st.image("logo_ruas.png", use_container_width=True)
+# Tulisan kredit tepat di bawah logo
 st.markdown('<p class="dev-text">Developed by Hardianto | Powered by RUAS STUDIO</p></div>', unsafe_allow_html=True)
