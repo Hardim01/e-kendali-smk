@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 
 # ==========================================
-# 1. CSS: TAMPILAN ELEGAN & SIDEBAR FIX
+# 1. CSS: LOCK SEMUA POSISI & SIDEBAR
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
@@ -12,33 +12,37 @@ st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
+    /* Digital Clock Simetris */
     .digital-clock { 
         font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3.2em; 
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 15px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
     
-    /* Logout Button Styling */
-    .stButton > button {
-        width: 100%;
-        border-radius: 8px;
+    /* Paksa Sidebar Logout Supaya Terlihat Jelas */
+    section[data-testid="stSidebar"] {
+        background-color: #0e1117;
+        border-right: 1px solid #333;
+    }
+
+    /* Style Tombol Logout Merah */
+    .stSidebar [data-testid="stButton"] button {
+        background-color: #d9534f !important;
+        color: white !important;
+        border-radius: 10px;
         font-weight: bold;
+        width: 100%;
+        height: 45px;
     }
-    
-    /* Login Form Box */
-    div[data-testid="stForm"] { 
-        margin: 0 auto !important; 
-        width: 450px !important; 
-        border: 2px solid #ffc107 !important; 
-        border-radius: 15px; 
-    }
-    
-    /* Footer Credit Styling */
+
+    div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
+
+    /* Footer Credit */
     .footer-container {
         display: flex;
         flex-direction: column;
         align-items: center;
-        margin-top: 50px;
+        margin-top: 60px;
         padding-top: 20px;
         border-top: 1px solid #333;
     }
@@ -47,7 +51,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE & SESSION
+# 2. DATA & DATABASE
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -75,7 +79,7 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 3. LOGIN PAGE
+# 3. LOGIN PAGE (LOGO TENGAH)
 # ==========================================
 if not st.session_state.logged_in:
     _, l_col, _ = st.columns([1, 0.4, 1])
@@ -91,29 +95,29 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 4. SIDEBAR (LOGOUT & CHANGE PASSWORD)
+# 4. SIDEBAR: LOGOUT & PW (SELALU ADA)
 # ==========================================
 with st.sidebar:
     st.image("logo_smk.png", width=80)
     st.markdown(f"### 👤 {st.session_state.user_role}")
     st.divider()
     
-    # 🔑 CHANGE PASSWORD FUNCTION
-    with st.expander("🔑 Change Password"):
-        new_pw = st.text_input("New PW:", type="password")
-        if st.button("Save New Password"):
-            st.session_state.users[st.session_state.user_role] = new_pw
-            st.success("Password Updated!")
-            
-    st.divider()
-    
-    # 🚪 LOGOUT BUTTON (RED)
-    if st.button("🚪 LOGOUT", type="primary"):
+    # 🚪 LOGOUT BUTTON TERATAS
+    if st.button("🚪 LOGOUT"):
         st.session_state.logged_in = False
         st.rerun()
+        
+    st.divider()
+    
+    # 🔑 CHANGE PASSWORD
+    with st.expander("🔑 Change Password"):
+        new_pw = st.text_input("New PW:", type="password")
+        if st.button("Save Password"):
+            st.session_state.users[st.session_state.user_role] = new_pw
+            st.success("Success!")
 
 # ==========================================
-# 5. DASHBOARD CONTENT
+# 5. DASHBOARD (LOGO & JAM TENGAH)
 # ==========================================
 _, d_col, _ = st.columns([1, 0.3, 1])
 with d_col: st.image("logo_smk.png", use_container_width=True)
@@ -127,11 +131,11 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         st.table(df_mon[::-1] if not df_mon.empty else pd.DataFrame(columns=["Time", "Staff", "Activity"]))
     with t2:
         target = st.multiselect("Select Staff:", list(st.session_state.users.keys()))
-        msg = st.text_area("Instruction Details:")
-        if st.button("Send & Archive"):
+        msg = st.text_area("Task Details:")
+        if st.button("Send & Save"):
             df_ins = load_db("instruksi.csv")
             save_db(pd.concat([df_ins, pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg}])], ignore_index=True), "instruksi.csv")
-            st.success("Instruction Dispatched!")
+            st.success("Dispatched!")
     with t3:
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
@@ -144,11 +148,11 @@ else:
     # STAFF VIEW
     st1, st2, st3 = st.tabs(["📝 WORK REPORT", "🔔 INSTRUCTIONS", "📚 MY ARCHIVE"])
     with st1:
-        akt = st.text_area("What are you working on?")
-        if st.button("Submit To Archive"):
+        akt = st.text_area("Progress Update:")
+        if st.button("Submit Progress"):
             df_mon = load_db("monitor.csv")
             save_db(pd.concat([df_mon, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])], ignore_index=True), "monitor.csv")
-            st.success("Progress Saved!")
+            st.success("Saved!")
     with st2:
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
@@ -160,10 +164,10 @@ else:
             st.dataframe(df_all[df_all['Staff'] == st.session_state.user_role][::-1], use_container_width=True)
 
 # ==========================================
-# 6. FOOTER: RUAS LOGO & CREDIT
+# 6. FOOTER (LOGO RUAS & CREDIT ENGLISH)
 # ==========================================
 st.markdown('<div class="footer-container">', unsafe_allow_html=True)
-f1, f2, f3 = st.columns([1, 0.1, 1])
-with f2:
+_, f_logo, _ = st.columns([1, 0.1, 1])
+with f_logo:
     st.image("logo_ruas.png", use_container_width=True)
 st.markdown(f'<div class="dev-text">E-KENDALI SMK NASIONAL | Developed by Hardianto | Powered by RUAS STUDIO</div></div>', unsafe_allow_html=True)
