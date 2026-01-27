@@ -17,12 +17,18 @@ st.markdown("""
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 15px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
+    /* Style Tombol Keluar Merah */
+    div.stButton > button:first-child {
+        background-color: #d9534f;
+        color: white;
+        border-radius: 8px;
+    }
     div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. SISTEM DATABASE (ARSIP PERMANEN)
+# 2. SISTEM DATABASE & SESSION
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -32,9 +38,6 @@ def load_db(name):
     p = os.path.join(DB_DIR, name)
     return pd.read_csv(p) if os.path.exists(p) else pd.DataFrame()
 
-# ==========================================
-# 3. USER & SESSION
-# ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.update({
         "logged_in": False, "user_role": None,
@@ -51,7 +54,7 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 4. HALAMAN LOGIN
+# 3. HALAMAN LOGIN
 # ==========================================
 if not st.session_state.logged_in:
     _, l_col, _ = st.columns([1, 0.4, 1])
@@ -67,21 +70,29 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 5. DASHBOARD HEADER (TETAP TENGAH)
+# 4. SIDEBAR (LOGOUT ADA DI SINI!)
+# ==========================================
+with st.sidebar:
+    st.markdown(f"### 👤 {st.session_state.user_role}")
+    st.divider()
+    # Tombol Logout yang Hilang Sudah Kembali
+    if st.button("🚪 KELUAR SISTEM", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user_role = None
+        st.rerun()
+    st.divider()
+    st.write("SMK NASIONAL BANDUNG")
+
+# ==========================================
+# 5. DASHBOARD HEADER
 # ==========================================
 _, d_col, _ = st.columns([1, 0.3, 1])
 with d_col: st.image("logo_smk.png", use_container_width=True)
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
-
-with st.sidebar:
-    st.header(f"👤 {st.session_state.user_role}")
-    if st.button("🚪 KELUAR", use_container_width=True):
-        st.session_state.logged_in = False; st.rerun()
-
 st.divider()
 
 # ==========================================
-# 6. MENU UTAMA + ARSIP
+# 6. MENU UTAMA (ARSIP TETAP ADA)
 # ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     t1, t2, t3, t4, t5 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUKSI", "💰 KEUANGAN", "📁 ARSIP LAPORAN", "📚 ARSIP INSTRUKSI"])
@@ -90,31 +101,31 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         st.subheader("Monitoring Pekerjaan Hari Ini")
         df_mon = load_db("monitor.csv")
         if not df_mon.empty: st.dataframe(df_mon[::-1], use_container_width=True)
-        else: st.info("Belum ada aktivitas.")
+        else: st.info("Belum ada aktivitas harian.")
 
     with t2:
-        st.subheader("Kirim Instruksi Baru")
+        st.subheader("Kirim Instruksi")
         target = st.multiselect("Target Staf:", list(st.session_state.users.keys()))
         pesan = st.text_area("Isi Instruksi:")
         if st.button("Kirim & Arsipkan"):
             df_ins = load_db("instruksi.csv")
             new_ins = pd.DataFrame([{"Jam": waktu_wib, "Target": str(target), "Isi": pesan}])
             save_db(pd.concat([df_ins, new_ins], ignore_index=True), "instruksi.csv")
-            st.success("Instruksi Berhasil Dikirim!")
+            st.success("Terkirim!")
 
     with t3:
-        st.subheader("Kas Sekolah")
+        st.subheader("Kas Real-Time")
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
-            st.metric("Saldo Akhir", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
+            st.metric("Total Saldo", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
             st.dataframe(df_kas[::-1], use_container_width=True)
 
     with t4:
-        st.subheader("Riwayat Semua Laporan Staf")
+        st.subheader("Arsip Seluruh Laporan")
         st.dataframe(load_db("monitor.csv")[::-1], use_container_width=True)
 
     with t5:
-        st.subheader("Riwayat Instruksi Pimpinan")
+        st.subheader("Arsip Riwayat Instruksi")
         st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
 
 else:
@@ -127,20 +138,19 @@ else:
             df_mon = load_db("monitor.csv")
             new_mon = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Aktivitas": msg}])
             save_db(pd.concat([df_mon, new_mon], ignore_index=True), "monitor.csv")
-            st.success("Laporan tersimpan di arsip!")
+            st.success("Tersimpan!")
             
     with st2:
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
             for i, r in df_ins.iterrows():
-                if st.session_state.user_role in r['Target']:
+                if st.session_state.user_role in str(r['Target']):
                     st.warning(f"**[{r['Jam']}]** {r['Isi']}")
 
     with st3:
-        st.subheader("Catatan Kerja Saya")
         df_all = load_db("monitor.csv")
         if not df_all.empty:
             my_df = df_all[df_all['Staf'] == st.session_state.user_role]
             st.dataframe(my_df[::-1], use_container_width=True)
 
-st.markdown("<p style='text-align:center; color:grey; margin-top:50px;'>E-KENDALI SMK NASIONAL | ARSIP SYSTEM OK</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:grey; margin-top:50px;'>E-KENDALI SMK NASIONAL | LOGOUT FIXED</p>", unsafe_allow_html=True)
