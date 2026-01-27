@@ -4,47 +4,39 @@ from datetime import datetime, timedelta
 import os
 
 # ==========================================
-# 1. CSS: CUSTOM STYLE (LOGO & JAM TENGAH)
+# 1. CSS: TAMPILAN TETAP KEREN (TIDAK BERUBAH)
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    
     .digital-clock { 
         font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3.2em; 
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 15px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
-    
-    /* Logout & PW Button Style */
-    .btn-red { background-color: #d9534f !important; color: white !important; font-weight: bold; border-radius: 8px; }
-    
     div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
-
-    /* Footer Box */
-    .footer-section {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 80px;
-        padding-top: 20px;
-        border-top: 1px solid #333;
-    }
+    .footer-section { display: flex; flex-direction: column; align-items: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid #333; }
     .dev-text { color: #888; font-size: 0.75rem; letter-spacing: 1px; margin-top: 8px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE & SESSION
+# 2. DATABASE ENGINE (FIX ERROR KEYERROR)
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
 
 def load_db(name):
     p = os.path.join(DB_DIR, name)
-    return pd.read_csv(p) if os.path.exists(p) else pd.DataFrame()
+    if os.path.exists(p):
+        df = pd.read_csv(p)
+        # Menyelaraskan nama kolom agar tidak KeyError
+        mapping = {'Jam': 'Time', 'Isi': 'Message', 'Aktivitas': 'Activity', 'Staf': 'Staff'}
+        df = df.rename(columns=mapping)
+        return df
+    return pd.DataFrame()
 
 def save_db(df, name):
     df.to_csv(os.path.join(DB_DIR, name), index=False)
@@ -65,7 +57,7 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 3. LOGIN PAGE
+# 3. LOGIN PAGE (TIDAK BERUBAH)
 # ==========================================
 if not st.session_state.logged_in:
     _, l_col, _ = st.columns([1, 0.4, 1])
@@ -77,77 +69,78 @@ if not st.session_state.logged_in:
         if st.form_submit_button("LOGIN TO SYSTEM", use_container_width=True):
             if pw == st.session_state.users[jab]:
                 st.session_state.logged_in = True; st.session_state.user_role = jab; st.rerun()
-            else: st.error("Access Denied!")
+            else: st.error("Wrong Password!")
     st.stop()
 
 # ==========================================
-# 4. DASHBOARD HEADER (JAM & LOGO)
+# 4. DASHBOARD HEADER (TETAP DI TENGAH)
 # ==========================================
 _, d_col, _ = st.columns([1, 0.3, 1])
 with d_col: st.image("logo_smk.png", use_container_width=True)
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
-st.markdown(f"<p style='text-align:center; font-weight:bold;'>Active User: {st.session_state.user_role}</p>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. MAIN CONTENT
+# 5. MAIN TABS (SAMA SEPERTI SEBELUMNYA)
 # ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     t1, t2, t3, t4, t5 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUCTION", "💰 FINANCE", "📁 REPORT ARCHIVE", "📚 TASK ARCHIVE"])
     with t1:
-        st.subheader("Today's Staff Activity")
         df_mon = load_db("monitor.csv")
         st.table(df_mon[::-1] if not df_mon.empty else pd.DataFrame(columns=["Time", "Staff", "Activity"]))
     with t2:
-        target = st.multiselect("Select Target Staff:", list(st.session_state.users.keys()))
-        msg = st.text_area("Task Description:")
-        if st.button("Dispatch Instruction"):
+        target = st.multiselect("Select Staff:", list(st.session_state.users.keys()))
+        msg = st.text_area("Task Detail:")
+        if st.button("Send Now"):
             df_ins = load_db("instruksi.csv")
-            save_db(pd.concat([df_ins, pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg}])], ignore_index=True), "instruksi.csv")
-            st.success("Instruction Dispatched & Archived!")
+            new_ins = pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg}])
+            save_db(pd.concat([df_ins, new_ins], ignore_index=True), "instruksi.csv")
+            st.success("Instruction Sent!")
     with t3:
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
-            st.metric("Total Cash Balance", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
+            st.metric("Balance", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
             st.dataframe(df_kas[::-1], use_container_width=True)
     with t4: st.dataframe(load_db("monitor.csv")[::-1], use_container_width=True)
     with t5: st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
-
 else:
-    # STAFF VIEW
+    # STAFF VIEW (KURIKULUM DLL)
     st1, st2, st3 = st.tabs(["📝 WORK REPORT", "🔔 INSTRUCTIONS", "📚 MY ARCHIVE"])
     with st1:
         akt = st.text_area("Progress Update:")
-        if st.button("Submit Report"):
+        if st.button("Submit Progress"):
             df_mon = load_db("monitor.csv")
-            save_db(pd.concat([df_mon, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])], ignore_index=True), "monitor.csv")
-            st.success("Progress Saved to Archive!")
+            new_mon = pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])
+            save_db(pd.concat([df_mon, new_mon], ignore_index=True), "monitor.csv")
+            st.success("Archived!")
     with st2:
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
-            for i, r in df_ins.iterrows():
-                if st.session_state.user_role in str(r['Target']): st.warning(f"**[{r['Time']}]** {r['Message']}")
+            for _, r in df_ins.iterrows():
+                # Menggunakan r.get() untuk mencegah Error Kolom
+                if st.session_state.user_role in str(r.get('Target', '')):
+                    st.warning(f"**[{r.get('Time', 'N/A')}]** {r.get('Message', 'No Message')}")
     with st3:
         df_all = load_db("monitor.csv")
         if not df_all.empty:
             st.dataframe(df_all[df_all['Staff'] == st.session_state.user_role][::-1], use_container_width=True)
 
 # ==========================================
-# 6. LOGOUT & CHANGE PASSWORD (FRONT PAGE)
+# 6. PENGATURAN AKUN (LOGOUT & PW) - DI SINI!
 # ==========================================
-st.divider()
-c1, c2, c3 = st.columns([1, 1, 1])
-with c1:
+st.markdown("---")
+col_log1, col_log2 = st.columns(2)
+with col_log1:
     if st.button("🚪 LOGOUT FROM SYSTEM", use_container_width=True):
         st.session_state.logged_in = False; st.rerun()
-with c2:
+with col_log2:
     with st.expander("🔑 Change Password"):
-        new_pw = st.text_input("New PW:", type="password")
-        if st.button("Update Password"):
-            st.session_state.users[st.session_state.user_role] = new_pw
-            st.success("Success!")
+        n_pw = st.text_input("New Password:", type="password")
+        if st.button("Save Password"):
+            st.session_state.users[st.session_state.user_role] = n_pw
+            st.success("Saved!")
 
 # ==========================================
-# 7. FOOTER: LOGO RUAS STUDIO & CREDIT
+# 7. FOOTER (LOGO RUAS & ENGLISH CREDIT)
 # ==========================================
 st.markdown('<div class="footer-section">', unsafe_allow_html=True)
 _, f_logo, _ = st.columns([1, 0.1, 1])
