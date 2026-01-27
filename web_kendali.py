@@ -23,7 +23,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE ENGINE
+# 2. DATABASE ENGINE (FIX KEYERROR)
 # ==========================================
 DB_DIR = "database"
 UPLOAD_DIR = "uploads"
@@ -34,6 +34,13 @@ def load_db(name):
     p = os.path.join(DB_DIR, name)
     if os.path.exists(p):
         df = pd.read_csv(p)
+        # Standarisasi Nama Kolom agar tidak Error KeyError
+        mapping = {
+            'Time': 'Jam', 'Staff': 'Staf', 'Activity': 'Aktivitas', 
+            'Attachment': 'File', 'Source': 'Sumber', 'PIC': 'PIC',
+            'Message': 'Pesan', 'Target': 'Target'
+        }
+        df = df.rename(columns=mapping)
         if name == "kas.csv" and not df.empty:
             df['Masuk'] = pd.to_numeric(df['Masuk'], errors='coerce').fillna(0)
             df['Keluar'] = pd.to_numeric(df['Keluar'], errors='coerce').fillna(0)
@@ -76,7 +83,7 @@ if not st.session_state.logged_in:
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. LOGIKA DASHBOARD
+# 3. DASHBOARD LOGIC
 # ==========================================
 list_sumber = ["BOS", "SPP", "PIP", "RMP", "Sumbangan", "Lain-lain"]
 
@@ -94,7 +101,7 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         st.subheader("Kirim Instruksi Baru")
         target = st.multiselect("Target Staf:", list(st.session_state.users.keys()))
         msg = st.text_area("Isi Instruksi:")
-        f_ins = st.file_uploader("Lampiran (PDF/JPG/Video):", type=['pdf','docx','jpg','png','mp4'], key="ins_kepsek")
+        f_ins = st.file_uploader("Lampiran:", type=['pdf','docx','jpg','png','mp4'], key="ins_kepsek")
         if st.button("Kirim Sekarang"):
             fn = f_ins.name if f_ins else "-"
             if f_ins:
@@ -102,8 +109,6 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
             df_i = load_db("instruksi.csv")
             new_i = pd.DataFrame([{"Jam": waktu_wib, "Target": str(target), "Pesan": msg, "File": fn}])
             save_db(pd.concat([df_i, new_i], ignore_index=True), "instruksi.csv"); st.success("Instruksi Terkirim!"); st.rerun()
-        st.divider()
-        st.write("Riwayat Instruksi:")
         st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
 
     with t3:
@@ -111,69 +116,71 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         if not df_k.empty:
             m_cols = st.columns(3)
             for i, s in enumerate(list_sumber):
-                ds = df_k[df_k['Source'] == s]
-                saldo = ds['Masuk'].sum() - ds['Keluar'].sum()
+                ds = df_k[df_k['Sumber'] == s] if 'Sumber' in df_k.columns else pd.DataFrame()
+                saldo = ds['Masuk'].sum() - ds['Keluar'].sum() if not ds.empty else 0
                 m_cols[i % 3].metric(f"Saldo {s}", f"Rp {saldo:,}")
             st.dataframe(df_k[::-1], use_container_width=True)
 
 else:
-    # --- DASHBOARD STAF ---
     menu = ["📝 LAPOR KERJA HARIAN", "🔔 INSTRUKSI & PELAKSANAAN"]
     if "Bendahara" in st.session_state.user_role: menu.insert(1, "💰 INPUT KAS")
     tabs = st.tabs(menu)
     
     with tabs[0]:
         st.subheader("Catat Kerja Harian")
-        akt = st.text_area("Apa yang Anda kerjakan hari ini?")
-        f_l = st.file_uploader("Upload Bukti (jika ada):", type=['pdf','docx','jpg','png','mp4'], key="lapor_staf")
-        if st.button("Kirim Laporan Harian"):
+        akt = st.text_area("Aktivitas Anda?")
+        f_l = st.file_uploader("Upload Bukti:", type=['pdf','docx','jpg','png','mp4'], key="lapor_staf")
+        if st.button("Kirim Laporan"):
             fn = f_l.name if f_l else "-"
             if f_l:
                 with open(os.path.join(UPLOAD_DIR, f_l.name), "wb") as f: f.write(f_l.getbuffer())
             df_m = load_db("monitor.csv")
             new_m = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Aktivitas": akt, "File": fn}])
-            save_db(pd.concat([df_m, new_m], ignore_index=True), "monitor.csv"); st.success("Laporan Terkirim!"); st.rerun()
+            save_db(pd.concat([df_m, new_m], ignore_index=True), "monitor.csv"); st.success("Terkirim!"); st.rerun()
+        
         st.divider()
-        st.write("Riwayat Laporan Saya:")
         df_my = load_db("monitor.csv")
-        st.dataframe(df_my[df_my['Staf'] == st.session_state.user_role][::-1], use_container_width=True)
+        if not df_my.empty and 'Staf' in df_my.columns:
+            st.write("Riwayat Laporan Saya:")
+            st.dataframe(df_my[df_my['Staf'] == st.session_state.user_role][::-1], use_container_width=True)
 
     with tabs[-1]:
-        st.subheader("🔔 Kotak Masuk Instruksi")
+        st.subheader("🔔 Instruksi Bapak Kepsek")
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
             for i, r in df_ins.iterrows():
                 if st.session_state.user_role in str(r.get('Target', '')):
-                    with st.expander(f"🔴 INSTRUKSI: {r['Jam']}"):
-                        st.write(f"**Pesan:** {r['Pesan']}")
-                        st.write(f"📎 **File:** {r['File']}")
+                    with st.expander(f"🔴 INSTRUKSI: {r.get('Jam','-')}"):
+                        st.write(f"**Pesan:** {r.get('Pesan','-')}")
+                        st.write(f"📎 **File:** {r.get('File','-')}")
                         st.divider()
-                        st.write("**Laksanakan Instruksi Ini:**")
-                        with st.form(f"form_res_{i}"):
-                            res_msg = st.text_area("Laporan Pelaksanaan:")
-                            res_file = st.file_uploader("Upload Bukti Pelaksanaan:", type=['pdf','docx','jpg','png','mp4'])
-                            if st.form_submit_button("Kirim Progres Ke Kepsek"):
-                                r_fn = res_file.name if res_file else "-"
-                                if res_file:
-                                    with open(os.path.join(UPLOAD_DIR, res_file.name), "wb") as f: f.write(res_file.getbuffer())
+                        with st.form(f"f_res_{i}"):
+                            res_msg = st.text_area("Hasil Pelaksanaan:")
+                            res_f = st.file_uploader("Bukti File:", type=['pdf','docx','jpg','png','mp4'])
+                            if st.form_submit_button("Lapor Selesai"):
+                                rf = res_f.name if res_f else "-"
+                                if res_f:
+                                    with open(os.path.join(UPLOAD_DIR, res_f.name), "wb") as f: f.write(res_f.getbuffer())
                                 df_res = load_db("respon_instruksi.csv")
-                                new_res = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Tugas_Dari": r['Jam'], "Hasil": res_msg, "File_Bukti": r_fn}])
+                                new_res = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Hasil": res_msg, "File_Bukti": rf}])
                                 save_db(pd.concat([df_res, new_res], ignore_index=True), "respon_instruksi.csv")
-                                st.success("Pelaksanaan Berhasil Dilaporkan!"); st.rerun()
+                                st.success("Berhasil Dilaporkan!"); st.rerun()
 
     if "Bendahara" in st.session_state.user_role:
         with tabs[1]:
             with st.form("kas"):
-                src = st.selectbox("Sumber:", list_sumber); ket = st.text_input("Ket"); m = st.number_input("Masuk", value=0); k = st.number_input("Keluar", value=0); pic = st.text_input("PIC"); sub = st.form_submit_button("Simpan")
+                src = st.selectbox("Sumber:", list_sumber); ket = st.text_input("Ket"); m = st.number_input("Masuk", 0); k = st.number_input("Keluar", 0); p_pic = st.text_input("PIC"); sub = st.form_submit_button("Simpan")
                 if sub:
-                    df_kas = load_db("kas.csv")
-                    save_db(pd.concat([df_kas, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Source": src, "Ket": ket, "Masuk": m, "Keluar": k, "PIC": pic}])], ignore_index=True), "kas.csv"); st.rerun()
+                    df_k = load_db("kas.csv")
+                    new_k = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Sumber": src, "Ket": ket, "Masuk": m, "Keluar": k, "PIC": p_pic}])
+                    save_db(pd.concat([df_k, new_k], ignore_index=True), "kas.csv"); st.rerun()
             df_v = load_db("kas.csv")
             if not df_v.empty:
                 v_cols = st.columns(3)
                 for j, smb in enumerate(list_sumber):
-                    val = df_v[df_v['Source'] == smb]
-                    v_cols[j % 3].info(f"**{smb}:** Rp {val['Masuk'].sum() - val['Keluar'].sum():,}")
+                    val = df_v[df_v['Sumber'] == smb] if 'Sumber' in df_v.columns else pd.DataFrame()
+                    saldo = val['Masuk'].sum() - val['Keluar'].sum() if not val.empty else 0
+                    v_cols[j % 3].info(f"**{smb}:** Rp {saldo:,}")
                 st.dataframe(df_v[::-1], use_container_width=True)
 
 # ==========================================
