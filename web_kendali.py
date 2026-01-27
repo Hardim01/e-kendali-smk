@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 
 # ==========================================
-# 1. CSS: LOCK SEMUA POSISI & SIDEBAR
+# 1. CSS: CUSTOM STYLE (LOGO & JAM TENGAH)
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
@@ -12,46 +12,32 @@ st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
-    /* Digital Clock Simetris */
     .digital-clock { 
         font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3.2em; 
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 15px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
     
-    /* Paksa Sidebar Logout Supaya Terlihat Jelas */
-    section[data-testid="stSidebar"] {
-        background-color: #0e1117;
-        border-right: 1px solid #333;
-    }
-
-    /* Style Tombol Logout Merah */
-    .stSidebar [data-testid="stButton"] button {
-        background-color: #d9534f !important;
-        color: white !important;
-        border-radius: 10px;
-        font-weight: bold;
-        width: 100%;
-        height: 45px;
-    }
-
+    /* Logout & PW Button Style */
+    .btn-red { background-color: #d9534f !important; color: white !important; font-weight: bold; border-radius: 8px; }
+    
     div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
 
-    /* Footer Credit */
-    .footer-container {
+    /* Footer Box */
+    .footer-section {
         display: flex;
         flex-direction: column;
         align-items: center;
-        margin-top: 60px;
+        margin-top: 80px;
         padding-top: 20px;
         border-top: 1px solid #333;
     }
-    .dev-text { color: #666; font-size: 0.7rem; letter-spacing: 1px; margin-top: 5px; }
+    .dev-text { color: #888; font-size: 0.75rem; letter-spacing: 1px; margin-top: 8px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATA & DATABASE
+# 2. DATABASE & SESSION
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -79,7 +65,7 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 3. LOGIN PAGE (LOGO TENGAH)
+# 3. LOGIN PAGE
 # ==========================================
 if not st.session_state.logged_in:
     _, l_col, _ = st.columns([1, 0.4, 1])
@@ -95,51 +81,33 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 4. SIDEBAR: LOGOUT & PW (SELALU ADA)
-# ==========================================
-with st.sidebar:
-    st.image("logo_smk.png", width=80)
-    st.markdown(f"### 👤 {st.session_state.user_role}")
-    st.divider()
-    
-    # 🚪 LOGOUT BUTTON TERATAS
-    if st.button("🚪 LOGOUT"):
-        st.session_state.logged_in = False
-        st.rerun()
-        
-    st.divider()
-    
-    # 🔑 CHANGE PASSWORD
-    with st.expander("🔑 Change Password"):
-        new_pw = st.text_input("New PW:", type="password")
-        if st.button("Save Password"):
-            st.session_state.users[st.session_state.user_role] = new_pw
-            st.success("Success!")
-
-# ==========================================
-# 5. DASHBOARD (LOGO & JAM TENGAH)
+# 4. DASHBOARD HEADER (JAM & LOGO)
 # ==========================================
 _, d_col, _ = st.columns([1, 0.3, 1])
 with d_col: st.image("logo_smk.png", use_container_width=True)
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
+st.markdown(f"<p style='text-align:center; font-weight:bold;'>Active User: {st.session_state.user_role}</p>", unsafe_allow_html=True)
 
+# ==========================================
+# 5. MAIN CONTENT
+# ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     t1, t2, t3, t4, t5 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUCTION", "💰 FINANCE", "📁 REPORT ARCHIVE", "📚 TASK ARCHIVE"])
-    
     with t1:
+        st.subheader("Today's Staff Activity")
         df_mon = load_db("monitor.csv")
         st.table(df_mon[::-1] if not df_mon.empty else pd.DataFrame(columns=["Time", "Staff", "Activity"]))
     with t2:
-        target = st.multiselect("Select Staff:", list(st.session_state.users.keys()))
-        msg = st.text_area("Task Details:")
-        if st.button("Send & Save"):
+        target = st.multiselect("Select Target Staff:", list(st.session_state.users.keys()))
+        msg = st.text_area("Task Description:")
+        if st.button("Dispatch Instruction"):
             df_ins = load_db("instruksi.csv")
             save_db(pd.concat([df_ins, pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg}])], ignore_index=True), "instruksi.csv")
-            st.success("Dispatched!")
+            st.success("Instruction Dispatched & Archived!")
     with t3:
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
-            st.metric("Total Balance", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
+            st.metric("Total Cash Balance", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
             st.dataframe(df_kas[::-1], use_container_width=True)
     with t4: st.dataframe(load_db("monitor.csv")[::-1], use_container_width=True)
     with t5: st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
@@ -149,10 +117,10 @@ else:
     st1, st2, st3 = st.tabs(["📝 WORK REPORT", "🔔 INSTRUCTIONS", "📚 MY ARCHIVE"])
     with st1:
         akt = st.text_area("Progress Update:")
-        if st.button("Submit Progress"):
+        if st.button("Submit Report"):
             df_mon = load_db("monitor.csv")
             save_db(pd.concat([df_mon, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])], ignore_index=True), "monitor.csv")
-            st.success("Saved!")
+            st.success("Progress Saved to Archive!")
     with st2:
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
@@ -164,10 +132,25 @@ else:
             st.dataframe(df_all[df_all['Staff'] == st.session_state.user_role][::-1], use_container_width=True)
 
 # ==========================================
-# 6. FOOTER (LOGO RUAS & CREDIT ENGLISH)
+# 6. LOGOUT & CHANGE PASSWORD (FRONT PAGE)
 # ==========================================
-st.markdown('<div class="footer-container">', unsafe_allow_html=True)
+st.divider()
+c1, c2, c3 = st.columns([1, 1, 1])
+with c1:
+    if st.button("🚪 LOGOUT FROM SYSTEM", use_container_width=True):
+        st.session_state.logged_in = False; st.rerun()
+with c2:
+    with st.expander("🔑 Change Password"):
+        new_pw = st.text_input("New PW:", type="password")
+        if st.button("Update Password"):
+            st.session_state.users[st.session_state.user_role] = new_pw
+            st.success("Success!")
+
+# ==========================================
+# 7. FOOTER: LOGO RUAS STUDIO & CREDIT
+# ==========================================
+st.markdown('<div class="footer-section">', unsafe_allow_html=True)
 _, f_logo, _ = st.columns([1, 0.1, 1])
 with f_logo:
     st.image("logo_ruas.png", use_container_width=True)
-st.markdown(f'<div class="dev-text">E-KENDALI SMK NASIONAL | Developed by Hardianto | Powered by RUAS STUDIO</div></div>', unsafe_allow_html=True)
+st.markdown('<p class="dev-text">Developed by Hardianto | Powered by RUAS STUDIO</p></div>', unsafe_allow_html=True)
