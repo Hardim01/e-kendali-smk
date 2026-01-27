@@ -7,13 +7,20 @@ import ast
 import time 
 
 # ==========================================
-# 1. PAGE CONFIG & UI STYLE
+# 1. PAGE CONFIG & CLEAN UI (HIDE MANAGE APP)
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide", page_icon="🏛️")
 
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    /* Sembunyikan Header, Footer, dan Tombol Manage App */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    [data-testid="stStatusWidget"] {display: none;}
+    .stDeployButton {display: none;}
+    
+    /* Style Komponen Dashboard */
     .marquee-container { background-color: #002b5b; color: #ffffff; padding: 12px 0; font-weight: bold; border-bottom: 4px solid #ffc107; margin-bottom: 25px; overflow: hidden; white-space: nowrap; }
     .marquee-text { display: inline-block; padding-left: 100%; animation: marquee 20s linear infinite; font-size: 1.2rem; }
     @keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
@@ -26,7 +33,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. FUNGSI UTAMA (DATABASE & FILE)
+# 2. DATABASE & FILE HANDLER
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -45,8 +52,10 @@ def load_data(filename):
     if os.path.exists(path):
         try:
             df = pd.read_csv(path)
-            if filename == "database_kas.csv" and 'Kategori' not in df.columns:
-                df['Kategori'] = 'DANA NON-BOS'
+            # Proteksi agar tidak Error jika kolom 'Kategori' belum ada (Data Lama)
+            if filename == "database_kas.csv" and not df.empty:
+                if 'Kategori' not in df.columns:
+                    df['Kategori'] = 'DANA NON-BOS'
             return df.to_dict('records')
         except: return []
     return []
@@ -66,11 +75,13 @@ def display_attachment(file_info):
     except: pass
 
 # ==========================================
-# 3. SESSION & LOGIN LOGIC
+# 3. SESSION & LOGIN
 # ==========================================
 USERS = {
     "Kepala Sekolah": "kepsek123", "Ketua Tata Usaha": "ktu123", "Bendahara Bos": "bos123", 
-    "Bendahara Sekolah": "bendahara123", "Waka Kurikulum": "kurikulum123", "ADMIN SISTEM": "admin789"
+    "Bendahara Sekolah": "bendahara123", "Staf bendahara Sekolah": "stafbend123",
+    "Waka Kurikulum": "kurikulum123", "Waka Kesiswaan": "wakakes123", 
+    "Waka Hubin": "hubin123", "Waka Sarpras": "sarpras123", "ADMIN SISTEM": "admin789"
 }
 
 if "logged_in" not in st.session_state:
@@ -84,110 +95,114 @@ if "logged_in" not in st.session_state:
 
 waktu_skrg = datetime.now().strftime("%H:%M:%S")
 
-# --- INTERFACE LOGIN ---
+# --- UI LOGIN ---
 if not st.session_state.logged_in:
-    st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Pekerjaan memang penting tapi Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
+    st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
+    _, col_log, _ = st.columns([1, 1, 1])
+    with col_log:
         logo = get_base64_image("logo_smk.png")
         if logo: st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{logo}" width="150"></div>', unsafe_allow_html=True)
         st.markdown('<p class="welcome-text-gold">E-KENDALI SEKOLAH</p>', unsafe_allow_html=True)
-        
-        jabatan = st.selectbox("Pilih Jabatan:", ["--- Pilih ---"] + list(USERS.keys()))
-        sandi = st.text_input("Kode Akses:", type="password")
-        
+        jab = st.selectbox("Pilih Jabatan:", ["--- Pilih ---"] + list(USERS.keys()))
+        pw = st.text_input("Kode Akses:", type="password")
         if st.button("MASUK SISTEM", use_container_width=True):
-            if jabatan in USERS and sandi == USERS[jabatan]:
+            if jab in USERS and pw == USERS[jab]:
                 st.session_state.logged_in = True
-                st.session_state.user_role = jabatan
+                st.session_state.user_role = jab
                 st.rerun()
-            else:
-                st.error("Akses Ditolak!")
-    st.stop() # Mencegah dashboard muncul sebelum login
+            else: st.error("Akses Ditolak!")
+    st.stop()
 
 # ==========================================
 # 4. DASHBOARD (SETELAH LOGIN)
 # ==========================================
-# Hitung Saldo
+# Perhitungan Saldo Aman (Anti-KeyError)
 df_kas = pd.DataFrame(st.session_state.data_kas)
 s_bos = 0; s_non = 0
 if not df_kas.empty:
-    b = df_kas[df_kas['Kategori'] == 'DANA BOS']
-    s_bos = pd.to_numeric(b['Masuk']).sum() - pd.to_numeric(b['Keluar']).sum()
-    n = df_kas[df_kas['Kategori'] == 'DANA NON-BOS']
-    s_non = pd.to_numeric(n['Masuk']).sum() - pd.to_numeric(n['Keluar']).sum()
+    if 'Kategori' not in df_kas.columns: df_kas['Kategori'] = 'DANA NON-BOS'
+    b_df = df_kas[df_kas['Kategori'] == 'DANA BOS']
+    s_bos = pd.to_numeric(b_df['Masuk'], errors='coerce').sum() - pd.to_numeric(b_df['Keluar'], errors='coerce').sum()
+    n_df = df_kas[df_kas['Kategori'] == 'DANA NON-BOS']
+    s_non = pd.to_numeric(n_df['Masuk'], errors='coerce').sum() - pd.to_numeric(n_df['Keluar'], errors='coerce').sum()
 
-# Sidebar
+# SIDEBAR
 with st.sidebar:
     st.markdown(f"<h2 class='digital-clock-main'>{waktu_skrg}</h2>", unsafe_allow_html=True)
-    st.success(f"User: {st.session_state.user_role}")
-    if st.button("🚪 LOGOUT"):
+    st.success(f"Login: {st.session_state.user_role}")
+    if st.button("🚪 KELUAR SISTEM"):
         st.session_state.logged_in = False; st.rerun()
     st.divider()
-    st.markdown("<p class='dev-name'>HARDIANTO</p><p class='ruas-text'>RUAS STUDIO</p>", unsafe_allow_html=True)
+    logo_ruas = get_base64_image("logo_ruas.png")
+    if logo_ruas: st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{logo_ruas}" width="50"></div>', unsafe_allow_html=True)
+    st.markdown("<p class='dev-name'>HARDIANTO</p><p class='ruas-text'>RUAS STUDIO © 2026</p>", unsafe_allow_html=True)
 
 st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
 
-# Tampilan Kepsek vs Staf
+# --- LOGIKA TAMPILAN ROLE ---
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     c1, c2 = st.columns(2)
-    c1.metric("💰 SALDO BOS", f"Rp {s_bos:,.0f}")
-    c2.metric("💵 SALDO NON-BOS", f"Rp {s_non:,.0f}")
+    c1.metric("💰 SALDO DANA BOS", f"Rp {s_bos:,.0f}")
+    c2.metric("💵 SALDO DANA NON-BOS", f"Rp {s_non:,.0f}")
     
-    t1, t2, t3, t4 = st.tabs(["🎥 LIVE MONITOR", "📁 LAPORAN", "✍️ INSTRUKSI", "💰 KEUANGAN"])
-    with t1: st.table(pd.DataFrame(st.session_state.live_monitor)[::-1])
+    t1, t2, t3, t4 = st.tabs(["🎥 MONITOR LIVE", "📁 LAPORAN MASUK", "✍️ INSTRUKSI", "💰 JURNAL KEUANGAN"])
+    with t1: 
+        if st.session_state.live_monitor: st.table(pd.DataFrame(st.session_state.live_monitor)[::-1])
     with t2:
         for r in reversed(st.session_state.laporan_masuk):
             with st.expander(f"Laporan {r['Dari']} ({r['Jam']})"):
-                st.write(r['Isi'])
-                if 'Lampiran' in r: display_attachment(r['Lampiran'])
+                st.write(r['Isi']); display_attachment(r.get('Lampiran'))
     with t3:
-        tgt = st.multiselect("Pilih Staf:", [u for u in USERS.keys() if u != "Kepala Sekolah"])
-        msg = st.text_area("Pesan:")
+        target = st.multiselect("Pilih Staf:", [u for u in USERS.keys() if u != "Kepala Sekolah"])
+        inst = st.text_area("Pesan Instruksi:")
         if st.button("Kirim Instruksi"):
-            for s in tgt:
-                st.session_state.tugas_khusus.append({"Jam": waktu_skrg, "Untuk": s, "Instruksi": msg})
-            save_data(st.session_state.tugas_khusus, "database_tugas.csv"); st.rerun()
+            for s in target:
+                st.session_state.tugas_khusus.append({"Jam": waktu_skrg, "Untuk": s, "Instruksi": inst})
+            save_data(st.session_state.tugas_khusus, "database_tugas.csv"); st.success("Terkirim!"); st.rerun()
+        st.divider(); st.subheader("📚 Arsip Instruksi")
+        st.dataframe(pd.DataFrame(st.session_state.tugas_khusus)[::-1], use_container_width=True)
     with t4:
         st.subheader("Jurnal BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA BOS'][::-1], use_container_width=True)
         st.subheader("Jurnal Non-BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA NON-BOS'][::-1], use_container_width=True)
 
 else:
-    # Dashboard Staf
-    t_staf1, t_staf2, t_staf3 = st.tabs(["📝 INPUT KERJA", "🔔 INSTRUKSI", "📚 ARSIP SAYA"])
-    with t_staf1:
+    # DASHBOARD STAF
+    st_t1, st_t2, st_t3 = st.tabs(["📝 INPUT KERJA", "🔔 INSTRUKSI KEPSEK", "📚 ARSIP SAYA"])
+    with st_t1:
         if "Bendahara" in st.session_state.user_role:
-            with st.form("keuangan"):
-                kat = st.radio("Sumber:", ["DANA BOS", "DANA NON-BOS"], horizontal=True)
+            with st.form("form_k"):
+                kat = st.radio("Pilih Kategori Dana:", ["DANA BOS", "DANA NON-BOS"], horizontal=True)
                 tipe = st.selectbox("Jenis:", ["Masuk", "Keluar"])
                 nom = st.number_input("Nominal:", min_value=0)
-                ket = st.text_input("Ket:")
-                if st.form_submit_button("Simpan"):
+                ket = st.text_input("Keterangan:")
+                if st.form_submit_button("Simpan Transaksi"):
                     st.session_state.data_kas.append({"Waktu": waktu_skrg, "Kategori": kat, "Masuk": nom if tipe=="Masuk" else 0, "Keluar": nom if tipe=="Keluar" else 0, "Keterangan": ket})
                     save_data(st.session_state.data_kas, "database_kas.csv"); st.rerun()
         
         ca, cb = st.columns(2)
         with ca:
-            act = st.text_area("Aktivitas Anda:")
+            act = st.text_area("Update Pekerjaan Hari Ini:")
             if st.button("Kirim Aktivitas"):
                 st.session_state.live_monitor.append({"Jam": waktu_skrg, "Staf": st.session_state.user_role, "Aktivitas": act})
-                save_data(st.session_state.live_monitor, "database_monitor.csv"); st.rerun()
+                save_data(st.session_state.live_monitor, "database_monitor.csv"); st.success("Tercatat!"); st.rerun()
         with cb:
-            lap = st.text_area("Laporan ke Kepsek:")
+            lap = st.text_area("Laporan Resmi ke Kepsek:")
+            f_lap = st.file_uploader("Lampiran (jika ada):")
             if st.button("Kirim Laporan"):
-                st.session_state.laporan_masuk.append({"Jam": waktu_skrg, "Dari": st.session_state.user_role, "Isi": lap})
-                save_data(st.session_state.laporan_masuk, "database_laporan.csv"); st.rerun()
+                fd = process_file_upload(f_lap)
+                st.session_state.laporan_masuk.append({"Jam": waktu_skrg, "Dari": st.session_state.user_role, "Isi": lap, "Lampiran": fd})
+                save_data(st.session_state.laporan_masuk, "database_laporan.csv"); st.success("Terkirim!"); st.rerun()
 
-    with t_staf2:
-        my_tasks = [t for t in st.session_state.tugas_khusus if t['Untuk'] == st.session_state.user_role]
-        for t in reversed(my_tasks):
-            st.info(f"[{t['Jam']}] {t['Instruksi']}")
+    with st_t2:
+        for t in reversed(st.session_state.tugas_khusus):
+            if t['Untuk'] == st.session_state.user_role:
+                st.info(f"[{t['Jam']}] {t['Instruksi']}")
 
-    with t_staf3:
-        st.subheader("Riwayat Kerja Anda")
-        my_history = [a for a in st.session_state.live_monitor if a['Staf'] == st.session_state.user_role]
-        st.table(pd.DataFrame(my_history)[::-1])
+    with st_t3:
+        st.subheader("Riwayat Aktivitas")
+        my_act = [a for a in st.session_state.live_monitor if a['Staf'] == st.session_state.user_role]
+        st.table(pd.DataFrame(my_act)[::-1])
 
+# Heartbeat Jam Digital
 time.sleep(1)
 st.rerun()
