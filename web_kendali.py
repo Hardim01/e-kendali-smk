@@ -2,39 +2,27 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-import base64
 import time 
 
 # ==========================================
-# 1. CSS: LOCK POSISI LOGO & JAM (SUDAH FIX)
+# 1. CSS: LOCK POSISI TENGAH (LOGO & JAM)
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    
-    .marquee-container { background-color: #002b5b; color: #ffffff; padding: 10px 0; font-weight: bold; border-bottom: 4px solid #ffc107; margin-bottom: 20px; overflow: hidden; white-space: nowrap; }
-    .marquee-text { display: inline-block; padding-left: 100%; animation: marquee 20s linear infinite; font-size: 1.1rem; }
-    @keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
-    
     .digital-clock { 
         font-family: 'Courier New', monospace; color: #ffc107; background-color: #000; font-size: 3.2em; 
         font-weight: bold; text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
         padding: 10px 25px; margin: 15px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
-    
-    div[data-testid="stForm"] {
-        margin: 0 auto !important;
-        width: 450px !important;
-        border: 2px solid #ffc107 !important;
-        border-radius: 15px;
-    }
+    div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. SISTEM DATABASE (FILESYSTEM)
+# 2. SISTEM DATABASE (ARSIP PERMANEN)
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -45,7 +33,7 @@ def load_db(name):
     return pd.read_csv(p) if os.path.exists(p) else pd.DataFrame()
 
 # ==========================================
-# 3. SESSION STATE & USER DATA
+# 3. USER & SESSION
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.update({
@@ -63,10 +51,9 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 4. HALAMAN LOGIN (TOTAL SYMMETRY)
+# 4. HALAMAN LOGIN
 # ==========================================
 if not st.session_state.logged_in:
-    st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
     _, l_col, _ = st.columns([1, 0.4, 1])
     with l_col: st.image("logo_smk.png", use_container_width=True)
     st.markdown("<h2 style='text-align:center; color:#ffc107;'>E-KENDALI LOGIN</h2>", unsafe_allow_html=True)
@@ -80,86 +67,80 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 5. DASHBOARD HEADER (LOGO & JAM TETAP BAGUS)
+# 5. DASHBOARD HEADER (TETAP TENGAH)
 # ==========================================
-st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
 _, d_col, _ = st.columns([1, 0.3, 1])
 with d_col: st.image("logo_smk.png", use_container_width=True)
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
 
-# Sidebar: Fitur Logout & Ganti Password
 with st.sidebar:
     st.header(f"👤 {st.session_state.user_role}")
-    if st.button("🚪 KELUAR SISTEM", use_container_width=True):
+    if st.button("🚪 KELUAR", use_container_width=True):
         st.session_state.logged_in = False; st.rerun()
-    with st.expander("🔑 Ganti Password"):
-        new_pw = st.text_input("Password Baru:", type="password")
-        if st.button("Simpan Password"):
-            st.session_state.users[st.session_state.user_role] = new_pw
-            st.success("Berhasil diubah!")
 
 st.divider()
 
 # ==========================================
-# 6. FITUR UTAMA (MONITOR, INSTRUKSI, KEUANGAN)
+# 6. MENU UTAMA + ARSIP
 # ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
-    t1, t2, t3, t4 = st.tabs(["🎥 MONITORING STAF", "📁 LAPORAN MASUK", "✍️ INSTRUKSI PIMPINAN", "💰 KEUANGAN REAL-TIME"])
+    t1, t2, t3, t4, t5 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUKSI", "💰 KEUANGAN", "📁 ARSIP LAPORAN", "📚 ARSIP INSTRUKSI"])
     
     with t1:
-        st.subheader("Aktivitas Staf Hari Ini")
+        st.subheader("Monitoring Pekerjaan Hari Ini")
         df_mon = load_db("monitor.csv")
-        if not df_mon.empty: st.table(df_mon[::-1])
-        else: st.info("Belum ada laporan masuk.")
+        if not df_mon.empty: st.dataframe(df_mon[::-1], use_container_width=True)
+        else: st.info("Belum ada aktivitas.")
 
     with t2:
-        st.subheader("File Laporan Masuk")
-        df_lap = load_db("laporan.csv")
-        if not df_lap.empty:
-            for i, r in df_lap.iterrows():
-                with st.expander(f"Lap: {r['Staf']} ({r['Jam']})"):
-                    st.write(r['Pesan'])
-                    if 'File' in r and str(r['File']) != 'nan':
-                        st.download_button("📥 Unduh Lampiran", r['File'], file_name=f"Lampiran_{r['Jam']}.png")
-        
-    with t3:
-        st.subheader("Kirim Instruksi Khusus")
-        target = st.multiselect("Pilih Jabatan:", list(st.session_state.users.keys()))
+        st.subheader("Kirim Instruksi Baru")
+        target = st.multiselect("Target Staf:", list(st.session_state.users.keys()))
         pesan = st.text_area("Isi Instruksi:")
-        file = st.file_uploader("Tambahkan Lampiran (Opsional):")
-        if st.button("Sebarkan Instruksi"):
+        if st.button("Kirim & Arsipkan"):
             df_ins = load_db("instruksi.csv")
-            new_ins = pd.DataFrame([{"Jam": waktu_wib, "Target": target, "Isi": pesan}])
-            save_db(pd.concat([df_ins, new_ins]), "instruksi.csv")
-            st.success("Instruksi telah dikirim!")
+            new_ins = pd.DataFrame([{"Jam": waktu_wib, "Target": str(target), "Isi": pesan}])
+            save_db(pd.concat([df_ins, new_ins], ignore_index=True), "instruksi.csv")
+            st.success("Instruksi Berhasil Dikirim!")
 
-    with t4:
-        st.subheader("Ringkasan Kas Sekolah")
+    with t3:
+        st.subheader("Kas Sekolah")
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
-            c1, c2 = st.columns(2)
-            c1.metric("Total Masuk", f"Rp {df_kas['Masuk'].sum():,}")
-            c2.metric("Total Keluar", f"Rp {df_kas['Keluar'].sum():,}")
+            st.metric("Saldo Akhir", f"Rp {df_kas['Masuk'].sum() - df_kas['Keluar'].sum():,}")
             st.dataframe(df_kas[::-1], use_container_width=True)
 
+    with t4:
+        st.subheader("Riwayat Semua Laporan Staf")
+        st.dataframe(load_db("monitor.csv")[::-1], use_container_width=True)
+
+    with t5:
+        st.subheader("Riwayat Instruksi Pimpinan")
+        st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
+
 else:
-    # MENU STAF
-    m1, m2 = st.tabs(["📝 LAPOR KERJA", "🔔 KOTAK INSTRUKSI"])
-    with m1:
-        msg = st.text_area("Apa yang Anda kerjakan?")
-        up = st.file_uploader("Upload Bukti Kerja (Gambar/PDF):")
+    # VIEW STAF
+    st1, st2, st3 = st.tabs(["📝 LAPOR KERJA", "🔔 INSTRUKSI", "📚 ARSIP SAYA"])
+    
+    with st1:
+        msg = st.text_area("Update pekerjaan Anda:")
         if st.button("Kirim Laporan"):
             df_mon = load_db("monitor.csv")
             new_mon = pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Aktivitas": msg}])
-            save_db(pd.concat([df_mon, new_mon]), "monitor.csv")
-            st.success("Laporan terkirim!")
+            save_db(pd.concat([df_mon, new_mon], ignore_index=True), "monitor.csv")
+            st.success("Laporan tersimpan di arsip!")
             
-    with m2:
-        st.subheader("Instruksi dari Pimpinan")
+    with st2:
         df_ins = load_db("instruksi.csv")
         if not df_ins.empty:
             for i, r in df_ins.iterrows():
-                if st.session_state.user_role in str(r['Target']):
+                if st.session_state.user_role in r['Target']:
                     st.warning(f"**[{r['Jam']}]** {r['Isi']}")
 
-st.markdown("<p style='text-align:center; color:grey; margin-top:50px;'>E-KENDALI SMK NASIONAL | HARDIANTO - RUAS STUDIO</p>", unsafe_allow_html=True)
+    with st3:
+        st.subheader("Catatan Kerja Saya")
+        df_all = load_db("monitor.csv")
+        if not df_all.empty:
+            my_df = df_all[df_all['Staf'] == st.session_state.user_role]
+            st.dataframe(my_df[::-1], use_container_width=True)
+
+st.markdown("<p style='text-align:center; color:grey; margin-top:50px;'>E-KENDALI SMK NASIONAL | ARSIP SYSTEM OK</p>", unsafe_allow_html=True)
