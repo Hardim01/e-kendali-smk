@@ -32,7 +32,6 @@ def load_db(name):
     p = os.path.join(DB_DIR, name)
     if os.path.exists(p):
         df = pd.read_csv(p)
-        # Menyelaraskan kolom agar tidak error
         mapping = {'Jam': 'Time', 'Isi': 'Message', 'Aktivitas': 'Activity', 'Staf': 'Staff', 'Sumber': 'Source'}
         df = df.rename(columns=mapping)
         return df
@@ -69,7 +68,7 @@ if not st.session_state.logged_in:
         if st.form_submit_button("LOGIN TO SYSTEM", use_container_width=True):
             if pw == st.session_state.users[jab]:
                 st.session_state.logged_in = True; st.session_state.user_role = jab; st.rerun()
-            else: st.error("Access Denied!")
+            else: st.error("Akses Ditolak!")
     st.stop()
 
 # ==========================================
@@ -83,67 +82,69 @@ st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_
 # 5. MAIN CONTENT
 # ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
-    t1, t2, t3, t4 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUCTION", "💰 FINANCE (ALL CASH)", "📚 ARCHIVE"])
+    t1, t2, t3, t4 = st.tabs(["🎥 MONITOR LIVE", "✍️ INSTRUKSI", "💰 KEUANGAN", "📚 ARSIP"])
     with t1:
         df_mon = load_db("monitor.csv")
         st.table(df_mon[::-1] if not df_mon.empty else pd.DataFrame(columns=["Time", "Staff", "Activity"]))
     with t2:
-        target = st.multiselect("Select Staff:", list(st.session_state.users.keys()))
-        msg = st.text_area("Task Detail:")
-        if st.button("Dispatch"):
+        target = st.multiselect("Pilih Staf:", list(st.session_state.users.keys()))
+        msg = st.text_area("Isi Instruksi:")
+        if st.button("Kirim Instruksi"):
             df_ins = load_db("instruksi.csv")
             save_db(pd.concat([df_ins, pd.DataFrame([{"Time": waktu_wib, "Target": str(target), "Message": msg}])], ignore_index=True), "instruksi.csv")
-            st.success("Sent!")
+            st.success("Terkirim!")
     with t3:
-        st.subheader("Financial Monitoring (BOS & SPP)")
+        st.subheader("Rekapitulasi Saldo Sekolah")
         df_kas = load_db("kas.csv")
         if not df_kas.empty:
-            # Tampilkan Ringkasan Per Sumber Dana
-            c_bos, c_spp = st.columns(2)
-            with c_bos:
-                bos_val = df_kas[df_kas['Source'] == 'BOS']
-                st.metric("BOS Balance", f"Rp {bos_val['Masuk'].sum() - bos_val['Keluar'].sum():,}")
-            with c_spp:
-                spp_val = df_kas[df_kas['Source'] == 'SPP/Internal']
-                st.metric("SPP/Internal Balance", f"Rp {spp_val['Masuk'].sum() - spp_val['Keluar'].sum():,}")
-            
+            c1, c2 = st.columns(2)
+            b_val = df_kas[df_kas['Source'] == 'BOS']
+            s_val = df_kas[df_kas['Source'] == 'SPP/Internal']
+            c1.metric("TOTAL SALDO BOS", f"Rp {b_val['Masuk'].sum() - b_val['Keluar'].sum():,}")
+            c2.metric("TOTAL SALDO SPP", f"Rp {s_val['Masuk'].sum() - s_val['Keluar'].sum():,}")
             st.divider()
-            st.write("Full Transaction Journal:")
+            st.write("Jurnal Transaksi Lengkap:")
             st.dataframe(df_kas[::-1], use_container_width=True)
     with t4: st.dataframe(load_db("instruksi.csv")[::-1], use_container_width=True)
 
 else:
-    # VIEW STAF & BENDAHARA
-    menu = ["📝 DAILY REPORT", "🔔 INSTRUCTIONS"]
+    menu = ["📝 LAPOR KERJA", "🔔 INSTRUKSI"]
     if "Bendahara" in st.session_state.user_role:
-        menu.insert(1, "💰 CASH FLOW (BOS/SPP)")
+        menu.insert(1, "💰 INPUT KAS")
     
     tabs = st.tabs(menu)
     
     with tabs[0]:
-        akt = st.text_area("Daily Activity Report:")
-        if st.button("Submit Report"):
+        akt = st.text_area("Laporan Pekerjaan Hari Ini:")
+        if st.button("Simpan Laporan"):
             df_mon = load_db("monitor.csv")
             save_db(pd.concat([df_mon, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])], ignore_index=True), "monitor.csv")
-            st.success("Report Saved!")
+            st.success("Laporan Tersimpan!")
 
     if "Bendahara" in st.session_state.user_role:
         with tabs[1]:
-            st.subheader("Recording Transaction")
-            with st.form("kas_v2"):
-                sumber = st.selectbox("Fund Source:", ["BOS", "SPP/Internal", "Lain-lain"])
-                ket = st.text_input("Description (Detail Transaction):")
-                masuk = st.number_input("Inflow (Rp):", min_value=0)
-                keluar = st.number_input("Outflow (Rp):", min_value=0)
-                pic = st.text_input("User/PIC:")
-                if st.form_submit_button("Save Transaction"):
+            st.subheader("Input Transaksi Baru")
+            with st.form("form_kas"):
+                src = st.selectbox("Sumber Dana:", ["BOS", "SPP/Internal", "Lainnya"])
+                desc = st.text_input("Keterangan Transaksi:")
+                m = st.number_input("Uang Masuk (Rp):", min_value=0)
+                k = st.number_input("Uang Keluar (Rp):", min_value=0)
+                u = st.text_input("Penanggung Jawab (PIC):")
+                if st.form_submit_button("Simpan Transaksi"):
                     df_kas = load_db("kas.csv")
-                    new_rec = pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Source": sumber, "Ket": ket, "Masuk": masuk, "Keluar": keluar, "User": pic}])
-                    save_db(pd.concat([df_kas, new_rec], ignore_index=True), "kas.csv")
-                    st.success(f"Record saved to {sumber} account!")
+                    save_db(pd.concat([df_kas, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Source": src, "Ket": desc, "Masuk": m, "Keluar": k, "User": u}])], ignore_index=True), "kas.csv")
+                    st.success("Data Berhasil Ditambahkan!")
+            
             st.divider()
-            st.write("Journal View")
-            st.dataframe(load_db("kas.csv")[::-1], use_container_width=True)
+            df_view = load_db("kas.csv")
+            if not df_view.empty:
+                st.subheader("Jumlah Saldo Terkini")
+                v_bos = df_view[df_view['Source'] == 'BOS']
+                v_spp = df_view[df_view['Source'] == 'SPP/Internal']
+                col_a, col_b = st.columns(2)
+                col_a.info(f"**Saldo BOS:** Rp {v_bos['Masuk'].sum() - v_bos['Keluar'].sum():,}")
+                col_b.info(f"**Saldo SPP:** Rp {v_spp['Masuk'].sum() - v_spp['Keluar'].sum():,}")
+                st.dataframe(df_view[::-1], use_container_width=True)
 
     with tabs[-1]:
         df_ins = load_db("instruksi.csv")
@@ -153,19 +154,19 @@ else:
                     st.warning(f"**[{r.get('Time', 'N/A')}]** {r.get('Message', 'No Message')}")
 
 # ==========================================
-# 6. ACTIONS & FOOTER
+# 6. FOOTER & ACTIONS
 # ==========================================
 st.divider()
-c1, c2 = st.columns(2)
-with c1:
+c_out1, c_out2 = st.columns(2)
+with c_out1:
     if st.button("🚪 LOGOUT", use_container_width=True):
         st.session_state.logged_in = False; st.rerun()
-with c2:
-    with st.expander("🔑 Password"):
-        n_pw = st.text_input("New PW:", type="password")
-        if st.button("Save PW"):
-            st.session_state.users[st.session_state.user_role] = n_pw
-            st.success("Updated!")
+with c_out2:
+    with st.expander("🔑 Ganti Password"):
+        p_baru = st.text_input("Password Baru:", type="password")
+        if st.button("Simpan PW"):
+            st.session_state.users[st.session_state.user_role] = p_baru
+            st.success("Selesai!")
 
 st.markdown('<div class="custom-footer">', unsafe_allow_html=True)
 _, mid_logo, _ = st.columns([1, 0.12, 1])
