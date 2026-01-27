@@ -22,7 +22,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE ENGINE (SISTEM ANTI-CRASH)
+# 2. DATABASE ENGINE (ANTI-CRASH)
 # ==========================================
 DB_DIR = "database"
 UPLOAD_DIR = "uploads"
@@ -34,14 +34,11 @@ def load_db(name):
     if os.path.exists(p):
         try:
             df = pd.read_csv(p)
-            # Normalisasi Kolom secara paksa agar tidak KeyError
             mapping = {
                 'Time': 'Jam', 'Staff': 'Staf', 'Activity': 'Aktivitas', 
                 'Attachment': 'File', 'Source': 'Sumber', 'Message': 'Pesan'
             }
             df = df.rename(columns=mapping)
-            
-            # Pastikan kolom Masuk & Keluar selalu angka
             if 'Masuk' in df.columns: df['Masuk'] = pd.to_numeric(df['Masuk'], errors='coerce').fillna(0)
             if 'Keluar' in df.columns: df['Keluar'] = pd.to_numeric(df['Keluar'], errors='coerce').fillna(0)
             return df
@@ -52,15 +49,25 @@ def load_db(name):
 def save_db(df, name):
     df.to_csv(os.path.join(DB_DIR, name), index=False)
 
-# DAFTAR 16 STAF LENGKAP
+# --- DAFTAR 16 STAF SESUAI LAMPIRAN ---
 if "users" not in st.session_state:
     st.session_state.users = {
-        "Kepala Sekolah": "kepsek123", "Waka Kurikulum": "kurikulum123", "Waka Kesiswaan": "kesiswaan123",
-        "Waka Hubin": "hubin123", "Waka Sarpras": "sarpras123", "Kepala Tata Usaha": "tu123",
-        "Bendahara BOS": "bos123", "Bendahara Sekolah": "bendahara123", "Staf Bendahara Sekolah": "stafbend123",
-        "Pembina OSIS": "osis123", "Ketertiban": "tertib123", "Kepala Lab": "lab123",
-        "BK (Bimbingan Konseling)": "bk123", "Kepala Perpustakaan": "perpus123",
-        "Dokumentasi & Publikasi": "dokpub123", "ADMIN UTAMA": "admin789"
+        "Kepala Sekolah": "kepsek123", 
+        "Waka Kurikulum": "kurikulum123", 
+        "Waka Kesiswaan": "kesiswaan123",
+        "Waka Hubin": "hubin123", 
+        "Waka Sarpras": "sarpras123", 
+        "Kepala Tata Usaha": "tu123",
+        "Bendahara BOS": "bos123", 
+        "Bendahara Sekolah": "bendahara123", 
+        "Staf Bendahara Sekolah": "stafbend123",
+        "Pembina OSIS": "osis123", 
+        "Ketertiban": "tertib123", 
+        "Kepala Lab": "lab123",
+        "BK (Bimbingan Konseling)": "bk123", 
+        "Kepala Perpustakaan": "perpus123",
+        "Dokumentasi & Publikasi": "dokpub123", 
+        "ADMIN UTAMA": "admin789"
     }
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
@@ -73,50 +80,51 @@ _, mid_logo_smk, _ = st.columns([1, 0.3, 1])
 with mid_logo_smk: st.image("logo_smk.png", use_container_width=True)
 st.markdown(f"""<div class="running-text"><marquee scrollamount="10">Kieu Bisa, Kitu Bisa, Sagala Bisa... Pekerjaan Memang Penting Tapi Sholat Yang Utama!</marquee></div>""", unsafe_allow_html=True)
 
-# LOGIN
+# LOGIN SYSTEM
 if not st.session_state.logged_in:
     _, l_col, _ = st.columns([1, 0.4, 1])
     with l_col:
-        with st.form("login_form"):
-            u = st.selectbox("Pilih Posisi", list(st.session_state.users.keys()))
+        with st.form("login"):
+            u = st.selectbox("Pilih Jabatan (Sesuai Lampiran)", list(st.session_state.users.keys()))
             p = st.text_input("Password", type="password")
-            if st.form_submit_button("MASUK SISTEM"):
+            if st.form_submit_button("LOGIN"):
                 if p == st.session_state.users[u]: 
                     st.session_state.logged_in = True; st.session_state.user_role = u; st.rerun()
-                else: st.error("Akses Ditolak")
+                else: st.error("Akses Ditolak!")
     st.stop()
 
 st.markdown(f'<div style="text-align:center;"><div class="digital-clock">{waktu_wib}</div></div>', unsafe_allow_html=True)
 
 # ==========================================
-# 3. KONTEN UTAMA
+# 3. KONTEN (PANTUAN 16 STAF & CASHFLOW)
 # ==========================================
-list_sumber = ["BOS", "SPP", "PIP", "RMP", "Sumbangan", "Lain-lain"]
+list_sumber = ["BOS", "SPP/Internal", "PIP", "RMP", "Sumbangan", "Lain-lain"]
 
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN UTAMA"]:
     t1, t2, t3 = st.tabs(["🎥 MONITOR STAF", "✍️ INSTRUKSI", "💰 CASHFLOW"])
     
     with t1:
-        st.write("**Laporan Harian:**")
+        st.subheader("Pantauan Real-Time 16 Staf")
+        st.write("**Laporan Rutin:**")
         st.dataframe(load_db("monitor.csv")[::-1], use_container_width=True)
-        st.write("**Laporan Instruksi:**")
+        st.write("**Progres Instruksi:**")
         st.dataframe(load_db("respon_instruksi.csv")[::-1], use_container_width=True)
 
     with t2:
-        target = st.multiselect("Target Staf:", list(st.session_state.users.keys()))
+        target = st.multiselect("Pilih Target Staf:", list(st.session_state.users.keys()))
         msg = st.text_area("Instruksi:")
-        f_up = st.file_uploader("Lampiran (PDF/Video/Foto):", type=['pdf','jpg','png','mp4'])
+        f_i = st.file_uploader("Lampiran:", type=['pdf','jpg','png','mp4'])
         if st.button("Kirim Instruksi"):
-            fn = f_up.name if f_up else "-"
-            if f_up: 
-                with open(os.path.join(UPLOAD_DIR, f_up.name), "wb") as f: f.write(f_up.getbuffer())
-            df_i = load_db("instruksi.csv")
-            save_db(pd.concat([df_i, pd.DataFrame([{"Jam": waktu_wib, "Target": str(target), "Pesan": msg, "File": fn}])], ignore_index=True), "instruksi.csv"); st.rerun()
+            fn = f_i.name if f_i else "-"
+            if f_i: 
+                with open(os.path.join(UPLOAD_DIR, f_i.name), "wb") as f: f.write(f_i.getbuffer())
+            save_db(pd.concat([load_db("instruksi.csv"), pd.DataFrame([{"Jam": waktu_wib, "Target": str(target), "Pesan": msg, "File": fn}])], ignore_index=True), "instruksi.csv"); st.rerun()
 
     with t3:
-        st.subheader("💰 Arus Kas Sekolah")
+        st.subheader("💰 Laporan Arus Kas (Cashflow)")
         df_k = load_db("kas.csv")
         if not df_k.empty:
+            # Saldo Header
             m_cols = st.columns(3)
             for i, s in enumerate(list_sumber):
                 ds = df_k[df_k['Sumber'] == s] if 'Sumber' in df_k.columns else pd.DataFrame()
@@ -124,37 +132,33 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN UTAMA"]:
                 m_cols[i % 3].metric(f"Saldo {s}", f"Rp {saldo:,}")
             st.divider()
             st.dataframe(df_k[::-1], use_container_width=True)
-        else: st.info("Data Cashflow Kosong")
+        else: st.info("Belum ada data keuangan.")
 
 else:
-    # MODUL STAF (PRIVASI TOTAL)
+    # MODUL KHUSUS STAF (PRIVASI TOTAL)
     menu = ["📝 LAPOR KERJA", "🔔 INSTRUKSI"]
     if "Bendahara" in st.session_state.user_role: menu.insert(1, "💰 INPUT KAS")
     tabs = st.tabs(menu)
     
     with tabs[0]:
-        akt = st.text_area("Aktivitas Anda:"); f_l = st.file_uploader("Bukti:", type=['pdf','jpg','png','mp4'])
-        if st.button("Kirim Laporan"):
+        akt = st.text_area("Aktivitas Harian:"); f_l = st.file_uploader("Upload Bukti:", type=['pdf','jpg','png','mp4'])
+        if st.button("Simpan Laporan"):
             fn = f_l.name if f_l else "-"
             if f_l: 
                 with open(os.path.join(UPLOAD_DIR, f_l.name), "wb") as f: f.write(f_l.getbuffer())
-            df_m = load_db("monitor.csv")
-            save_db(pd.concat([df_m, pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Aktivitas": akt, "File": fn}])], ignore_index=True), "monitor.csv"); st.rerun()
+            save_db(pd.concat([load_db("monitor.csv"), pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Aktivitas": akt, "File": fn}])], ignore_index=True), "monitor.csv"); st.rerun()
         
         st.divider()
         df_v = load_db("monitor.csv")
         if not df_v.empty and 'Staf' in df_v.columns:
-            # Proteksi: Hanya ambil baris milik user yang login
-            my_data = df_v[df_v['Staf'] == st.session_state.user_role]
-            st.dataframe(my_data[::-1], use_container_width=True)
+            st.dataframe(df_v[df_v['Staf'] == st.session_state.user_role][::-1], use_container_width=True)
 
     if "Bendahara" in st.session_state.user_role:
         with tabs[1]:
-            with st.form("k_form"):
-                src = st.selectbox("Sumber:", list_sumber); ket = st.text_input("Ket"); m = st.number_input("Masuk"); k = st.number_input("Keluar")
-                if st.form_submit_button("Simpan Kas"):
-                    df_kas = load_db("kas.csv")
-                    save_db(pd.concat([df_kas, pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Sumber": src, "Ket": ket, "Masuk": m, "Keluar": k}])], ignore_index=True), "kas.csv"); st.rerun()
+            with st.form("f_kas"):
+                src = st.selectbox("Sumber Dana:", list_sumber); ket = st.text_input("Keterangan"); m = st.number_input("Masuk"); k = st.number_input("Keluar")
+                if st.form_submit_button("Simpan & Hitung Saldo"):
+                    save_db(pd.concat([load_db("kas.csv"), pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Sumber": src, "Ket": ket, "Masuk": m, "Keluar": k}])], ignore_index=True), "kas.csv"); st.rerun()
             df_k_v = load_db("kas.csv")
             if not df_k_v.empty and 'Staf' in df_k_v.columns:
                 st.dataframe(df_k_v[df_k_v['Staf'] == st.session_state.user_role][::-1], use_container_width=True)
@@ -167,21 +171,23 @@ else:
                     with st.expander(f"🔴 TUGAS: {r.get('Jam','-')}"):
                         st.write(r.get('Pesan','-')); st.write(f"File: {r.get('File','-')}")
                         with st.form(f"res_{i}"):
-                            res_txt = st.text_area("Laporan:"); res_f = st.file_uploader("Upload Bukti:")
+                            res_txt = st.text_area("Laporan Pelaksanaan:"); res_f = st.file_uploader("Bukti:")
                             if st.form_submit_button("Lapor Selesai"):
                                 rf_n = res_f.name if res_f else "-"
                                 if res_f: 
                                     with open(os.path.join(UPLOAD_DIR, res_f.name), "wb") as f: f.write(res_f.getbuffer())
                                 save_db(pd.concat([load_db("respon_instruksi.csv"), pd.DataFrame([{"Jam": waktu_wib, "Staf": st.session_state.user_role, "Hasil": res_txt, "File_Bukti": rf_n}])], ignore_index=True), "respon_instruksi.csv"); st.rerun()
 
-# FOOTER
+# ==========================================
+# 4. FOOTER TENGAH & LOGO RUAS
+# ==========================================
 st.divider()
 c1, c2 = st.columns(2)
 with c1:
     if st.button("🚪 LOGOUT", use_container_width=True): st.session_state.logged_in = False; st.rerun()
 with c2:
     with st.expander("🔑 GANTI PASSWORD"):
-        new_p = st.text_input("Password Baru:", type="password")
+        new_p = st.text_input("Baru:", type="password")
         if st.button("Update"): st.session_state.users[st.session_state.user_role] = new_p; st.success("Ok")
 
 st.markdown("---")
