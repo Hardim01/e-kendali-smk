@@ -250,3 +250,4 @@ else:
 if st.session_state.logged_in:
     st.divider()
     if os.path.exists("kalender_akademik.png"): st.image("kalender_akademik.png", use_container_width=True)
+
