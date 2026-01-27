@@ -52,7 +52,7 @@ def load_data(filename):
     if os.path.exists(path):
         try:
             df = pd.read_csv(path)
-            # Proteksi agar tidak Error jika kolom 'Kategori' belum ada (Data Lama)
+            # PROTEKSI: Jika kolom Kategori belum ada, buat otomatis agar tidak Error
             if filename == "database_kas.csv" and not df.empty:
                 if 'Kategori' not in df.columns:
                     df['Kategori'] = 'DANA NON-BOS'
@@ -75,7 +75,7 @@ def display_attachment(file_info):
     except: pass
 
 # ==========================================
-# 3. SESSION & LOGIN
+# 3. SESSION & LOGIN (USERS UTUH)
 # ==========================================
 USERS = {
     "Kepala Sekolah": "kepsek123", "Ketua Tata Usaha": "ktu123", "Bendahara Bos": "bos123", 
@@ -121,8 +121,10 @@ df_kas = pd.DataFrame(st.session_state.data_kas)
 s_bos = 0; s_non = 0
 if not df_kas.empty:
     if 'Kategori' not in df_kas.columns: df_kas['Kategori'] = 'DANA NON-BOS'
+    
     b_df = df_kas[df_kas['Kategori'] == 'DANA BOS']
     s_bos = pd.to_numeric(b_df['Masuk'], errors='coerce').sum() - pd.to_numeric(b_df['Keluar'], errors='coerce').sum()
+    
     n_df = df_kas[df_kas['Kategori'] == 'DANA NON-BOS']
     s_non = pd.to_numeric(n_df['Masuk'], errors='coerce').sum() - pd.to_numeric(n_df['Keluar'], errors='coerce').sum()
 
@@ -139,7 +141,7 @@ with st.sidebar:
 
 st.markdown('<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>', unsafe_allow_html=True)
 
-# --- LOGIKA TAMPILAN ROLE ---
+# --- TAMPILAN KEPALA SEKOLAH ---
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     c1, c2 = st.columns(2)
     c1.metric("💰 SALDO DANA BOS", f"Rp {s_bos:,.0f}")
@@ -160,16 +162,19 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
                 st.session_state.tugas_khusus.append({"Jam": waktu_skrg, "Untuk": s, "Instruksi": inst})
             save_data(st.session_state.tugas_khusus, "database_tugas.csv"); st.success("Terkirim!"); st.rerun()
         st.divider(); st.subheader("📚 Arsip Instruksi")
-        st.dataframe(pd.DataFrame(st.session_state.tugas_khusus)[::-1], use_container_width=True)
+        if st.session_state.tugas_khusus: st.dataframe(pd.DataFrame(st.session_state.tugas_khusus)[::-1], use_container_width=True)
     with t4:
-        st.subheader("Jurnal BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA BOS'][::-1], use_container_width=True)
-        st.subheader("Jurnal Non-BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA NON-BOS'][::-1], use_container_width=True)
+        st.subheader("📊 Jurnal Dana BOS")
+        st.dataframe(df_kas[df_kas['Kategori']=='DANA BOS'][::-1], use_container_width=True)
+        st.subheader("📊 Jurnal Dana NON-BOS")
+        st.dataframe(df_kas[df_kas['Kategori']=='DANA NON-BOS'][::-1], use_container_width=True)
 
+# --- TAMPILAN STAF ---
 else:
-    # DASHBOARD STAF
     st_t1, st_t2, st_t3 = st.tabs(["📝 INPUT KERJA", "🔔 INSTRUKSI KEPSEK", "📚 ARSIP SAYA"])
     with st_t1:
         if "Bendahara" in st.session_state.user_role:
+            st.info(f"Saldo Saat Ini | BOS: Rp {s_bos:,.0f} | Non-BOS: Rp {s_non:,.0f}")
             with st.form("form_k"):
                 kat = st.radio("Pilih Kategori Dana:", ["DANA BOS", "DANA NON-BOS"], horizontal=True)
                 tipe = st.selectbox("Jenis:", ["Masuk", "Keluar"])
@@ -181,28 +186,33 @@ else:
         
         ca, cb = st.columns(2)
         with ca:
-            act = st.text_area("Update Pekerjaan Hari Ini:")
+            st.subheader("Aktivitas Kerja")
+            act = st.text_area("Kegiatan Anda saat ini:")
             if st.button("Kirim Aktivitas"):
                 st.session_state.live_monitor.append({"Jam": waktu_skrg, "Staf": st.session_state.user_role, "Aktivitas": act})
                 save_data(st.session_state.live_monitor, "database_monitor.csv"); st.success("Tercatat!"); st.rerun()
         with cb:
-            lap = st.text_area("Laporan Resmi ke Kepsek:")
-            f_lap = st.file_uploader("Lampiran (jika ada):")
+            st.subheader("Laporan Resmi")
+            lap = st.text_area("Isi Laporan ke Kepsek:")
+            f_lap = st.file_uploader("Lampiran:")
             if st.button("Kirim Laporan"):
                 fd = process_file_upload(f_lap)
                 st.session_state.laporan_masuk.append({"Jam": waktu_skrg, "Dari": st.session_state.user_role, "Isi": lap, "Lampiran": fd})
                 save_data(st.session_state.laporan_masuk, "database_laporan.csv"); st.success("Terkirim!"); st.rerun()
 
     with st_t2:
-        for t in reversed(st.session_state.tugas_khusus):
-            if t['Untuk'] == st.session_state.user_role:
+        st.subheader("Instruksi dari Kepala Sekolah")
+        my_tasks = [t for t in st.session_state.tugas_khusus if t['Untuk'] == st.session_state.user_role]
+        if my_tasks:
+            for t in reversed(my_tasks):
                 st.info(f"[{t['Jam']}] {t['Instruksi']}")
+        else: st.write("Belum ada instruksi.")
 
     with st_t3:
-        st.subheader("Riwayat Aktivitas")
+        st.subheader("Riwayat Pekerjaan Saya")
         my_act = [a for a in st.session_state.live_monitor if a['Staf'] == st.session_state.user_role]
-        st.table(pd.DataFrame(my_act)[::-1])
+        if my_act: st.table(pd.DataFrame(my_act)[::-1])
 
-# Heartbeat Jam Digital
+# Heartbeat Re-run
 time.sleep(1)
 st.rerun()
