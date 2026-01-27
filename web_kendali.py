@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 
 # ==========================================
-# 1. CSS: TAMPILAN & FOOTER
+# 1. CSS & TAMPILAN
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
@@ -17,7 +17,6 @@ st.markdown("""
         padding: 10px 25px; margin: 15px auto; display: inline-block; box-shadow: 0px 0px 15px #ffc107;
     }
     div[data-testid="stForm"] { margin: 0 auto !important; width: 450px !important; border: 2px solid #ffc107 !important; border-radius: 15px; }
-    
     .footer-section { 
         display: flex; flex-direction: column; align-items: center; text-align: center;
         margin-top: 50px; padding-top: 20px; border-top: 1px solid #333; 
@@ -27,7 +26,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE & LOGIKA MATEMATIKA (FIX)
+# 2. DATABASE ENGINE (FIX MATEMATIKA & KOLOM)
 # ==========================================
 DB_DIR = "database"
 if not os.path.exists(DB_DIR): os.makedirs(DB_DIR)
@@ -36,12 +35,12 @@ def load_db(name):
     p = os.path.join(DB_DIR, name)
     if os.path.exists(p):
         df = pd.read_csv(p)
-        mapping = {'Jam': 'Time', 'Aktivitas': 'Activity', 'Staf': 'Staff', 'Sumber': 'Source'}
+        # Mapping kolom agar konsisten
+        mapping = {'Jam': 'Time', 'Aktivitas': 'Activity', 'Staf': 'Staff', 'Sumber': 'Source', 'User': 'PIC'}
         df = df.rename(columns=mapping)
         if name == "kas.csv" and not df.empty:
             df['Masuk'] = pd.to_numeric(df['Masuk'], errors='coerce').fillna(0)
             df['Keluar'] = pd.to_numeric(df['Keluar'], errors='coerce').fillna(0)
-            # Fix data 'None' agar tetap terhitung ke saldo SPP
             df['Source'] = df['Source'].replace(['None', '', 'nan'], 'SPP/Internal')
         return df
     return pd.DataFrame()
@@ -54,9 +53,7 @@ if "logged_in" not in st.session_state:
         "logged_in": False, "user_role": None,
         "users": {
             "Kepala Sekolah": "kepsek123", "Waka Kurikulum": "kurikulum123", "Waka Kesiswaan": "kesiswaan123",
-            "Waka Hubin": "hubin123", "Waka Sarpras": "sarpras123", "Kepala Tata Usaha": "ktu123",
-            "Bendahara Bos": "bos123", "Bendahara Sekolah": "bendahara123", "Staf Bendahara Sekolah": "stafbend123",
-            "ADMIN SISTEM": "admin789"
+            "Bendahara Sekolah": "bendahara123", "Bendahara Bos": "bos123", "ADMIN SISTEM": "admin789"
         }
     })
 
@@ -92,7 +89,8 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         if not df_kas.empty:
             s_spp = df_kas[df_kas['Source'] == 'SPP/Internal']
             saldo = s_spp['Masuk'].sum() - s_spp['Keluar'].sum()
-            st.metric("SALDO BERSIH SPP", f"Rp {saldo:,}")
+            st.metric("SALDO BERSIH (NON-BOS)", f"Rp {saldo:,}")
+            st.write("Jurnal Transaksi Lengkap:")
             st.dataframe(df_kas[::-1], use_container_width=True)
 else:
     menu = ["📝 LAPOR KERJA", "🔔 INSTRUKSI"]
@@ -100,7 +98,7 @@ else:
     tabs = st.tabs(menu)
     
     with tabs[0]:
-        akt = st.text_area("Laporan Kerja:")
+        akt = st.text_area("Laporan Kerja Hari Ini:")
         if st.button("Simpan Laporan"):
             df_mon = load_db("monitor.csv")
             save_db(pd.concat([df_mon, pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Activity": akt}])], ignore_index=True), "monitor.csv")
@@ -108,25 +106,27 @@ else:
 
     if "Bendahara" in st.session_state.user_role:
         with tabs[1]:
-            with st.form("form_kas_fix"):
+            with st.form("form_kas_final"):
                 src = st.selectbox("Sumber Dana:", ["SPP/Internal", "BOS"])
-                ket = st.text_input("Keterangan:")
-                m = st.number_input("Masuk (Rp):", value=0); k = st.number_input("Keluar (Rp):", value=0)
+                ket = st.text_input("Keterangan (Contoh: Beli ATK):")
+                m = st.number_input("Masuk (Rp):", value=0)
+                k = st.number_input("Keluar (Rp):", value=0)
+                pic = st.text_input("Nama Penerima / PIC:") # KOLOM PIC KEMBALI!
                 if st.form_submit_button("Update Kas & Hitung Saldo"):
-                    new = pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Ket": ket, "Masuk": m, "Keluar": k, "Source": src}])
-                    save_db(pd.concat([df_kas, new], ignore_index=True), "kas.csv")
+                    df_kas = load_db("kas.csv")
+                    new_entry = pd.DataFrame([{"Time": waktu_wib, "Staff": st.session_state.user_role, "Ket": ket, "Masuk": m, "Keluar": k, "Source": src, "PIC": pic}])
+                    save_db(pd.concat([df_kas, new_entry], ignore_index=True), "kas.csv")
                     st.rerun()
             
-            # TAMPILAN SALDO DI BENDAHARA
             st.divider()
-            df_view = load_db("kas.csv")
-            if not df_view.empty:
-                s_spp = df_view[df_view['Source'] == 'SPP/Internal']
+            df_v = load_db("kas.csv")
+            if not df_v.empty:
+                s_spp = df_v[df_v['Source'] == 'SPP/Internal']
                 st.info(f"### 🧮 SALDO AKHIR SPP: Rp {s_spp['Masuk'].sum() - s_spp['Keluar'].sum():,}")
-                st.dataframe(df_view[::-1], use_container_width=True)
+                st.dataframe(df_v[::-1], use_container_width=True)
 
 # ==========================================
-# 5. ACCOUNT ACTIONS (PASSWORD & LOGOUT) - KEMBALI ADA!
+# 5. ACCOUNT ACTIONS (PASSWORD & LOGOUT)
 # ==========================================
 st.divider()
 col_act1, col_act2 = st.columns(2)
@@ -138,7 +138,7 @@ with col_act2:
         pw_baru = st.text_input("Password Baru:", type="password")
         if st.button("Simpan Password Baru"):
             st.session_state.users[st.session_state.user_role] = pw_baru
-            st.success("Password Berhasil Diperbarui!")
+            st.success("Berhasil diubah!")
 
 # ==========================================
 # 6. FOOTER
