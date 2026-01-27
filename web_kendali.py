@@ -5,7 +5,7 @@ import os
 import time 
 
 # ==========================================
-# 1. CSS: TOTAL CENTER ALIGNMENT
+# 1. CSS: PENARIK LOGO KE TENGAH (FIX)
 # ==========================================
 st.set_page_config(page_title="SMK NASIONAL - E-KENDALI", layout="wide")
 
@@ -13,52 +13,53 @@ st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
-    /* Memaksa semua elemen di dalam container utama jadi tengah */
-    .stApp {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .main-wrapper {
+    /* Container utama yang memaksa semua elemen ditarik ke tengah */
+    .center-all {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        width: 100%;
-        max-width: 500px;
-        margin: 0 auto;
-    }
-
-    .login-title {
-        color: #ffc107;
-        font-size: 2rem;
-        font-weight: bold;
-        margin: 20px 0;
         text-align: center;
         width: 100%;
     }
 
-    /* Kotak Login Tetap di Tengah */
+    /* Penarik khusus Logo agar tidak lari ke kiri */
+    .logo-container {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 120px;
+    }
+
+    .login-title {
+        color: #ffc107;
+        font-size: 2.2rem;
+        font-weight: bold;
+        margin-top: 15px;
+        margin-bottom: 25px;
+        text-align: center;
+    }
+
+    /* Form Login agar tetap ramping dan di tengah */
     .stForm {
-        width: 100% !important;
+        width: 450px !important;
         border: 2px solid #ffc107 !important;
         border-radius: 15px;
         background-color: #0e1117;
-        padding: 30px;
+        margin: 0 auto;
     }
 
     .digital-clock { 
         font-family: 'Courier New', monospace; color: #ffc107; 
         background-color: #000; font-size: 3em; font-weight: bold; 
         text-align: center; border: 3px solid #ffc107; border-radius: 12px; 
-        padding: 10px 20px; margin: 20px auto; display: block;
+        padding: 10px 20px; margin: 20px auto; display: inline-block;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATA STAF (15 JABATAN LENGKAP)
+# 2. DATA STAF (15 JABATAN)
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.update({
@@ -78,22 +79,21 @@ if "logged_in" not in st.session_state:
 waktu_wib = (datetime.now() + timedelta(hours=7)).strftime("%H:%M:%S")
 
 # ==========================================
-# 3. HALAMAN LOGIN: LOGO -> JUDUL -> FORM (LURUS TENGAH)
+# 3. HALAMAN LOGIN: SEMUA DITARIK KE TENGAH
 # ==========================================
 if not st.session_state.logged_in:
-    # Menggunakan wrapper untuk memastikan urutan vertikal di tengah
-    st.markdown('<div class="main-wrapper">', unsafe_allow_html=True)
+    # Menggunakan HTML untuk kontrol posisi logo yang lebih presisi
+    st.markdown('<div class="center-all">', unsafe_allow_html=True)
     
-    # A. Logo di Tengah
-    try:
-        st.image("logo_smk.png", width=120)
-    except:
-        st.write("🏛️")
+    # Menampilkan Logo dengan kolom bantuan agar benar-benar "tertarik" ke tengah
+    _, mid_col, _ = st.columns([1, 0.4, 1])
+    with mid_col:
+        try: st.image("logo_smk.png", use_container_width=True)
+        except: st.write("🏛️")
     
-    # B. Judul di Tengah
     st.markdown('<div class="login-title">E-KENDALI LOGIN</div>', unsafe_allow_html=True)
     
-    # C. Form di Tengah
+    # Kotak Login
     with st.form("login_center"):
         jab = st.selectbox("Pilih Jabatan:", list(st.session_state.users.keys()))
         pw = st.text_input("Password:", type="password")
@@ -106,17 +106,17 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 4. DASHBOARD: LOGO -> JAM (LURUS TENGAH)
+# 4. DASHBOARD HEADER
 # ==========================================
-st.markdown('<div class="main-wrapper">', unsafe_allow_html=True)
-try:
-    st.image("logo_smk.png", width=100)
-except:
-    st.write("🏛️")
+st.markdown('<div class="center-all">', unsafe_allow_html=True)
+_, mid_dash, _ = st.columns([1, 0.3, 1])
+with mid_dash:
+    try: st.image("logo_smk.png", use_container_width=True)
+    except: st.write("🏛️")
 st.markdown(f'<div class="digital-clock">{waktu_wib}</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
-st.info(f"Login Sebagai: {st.session_state.user_role}")
+st.info(f"👤 Aktif sebagai: {st.session_state.user_role}")
 if st.button("🚪 KELUAR"):
     st.session_state.logged_in = False; st.rerun()
