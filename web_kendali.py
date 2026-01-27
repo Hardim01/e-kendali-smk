@@ -100,21 +100,28 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# 4. SIDEBAR & TOOLS
+# 4. HEADER & PENGATURAN (DESAIN AWAL)
 # ==========================================
-with st.sidebar:
+st.markdown(teks_marquee, unsafe_allow_html=True)
+
+# Baris Header untuk Jam dan Tombol Logout
+col_h1, col_h2, col_h3 = st.columns([2, 2, 1])
+with col_h1:
     st.markdown(f"<h2 class='digital-clock-main'>{waktu_skrg}</h2>", unsafe_allow_html=True)
-    st.success(f"Login: {st.session_state.user_role}")
+with col_h2:
+    st.success(f"Login Sebagai: **{st.session_state.user_role}**")
     with st.expander("🔑 Ganti Password"):
         n_pw = st.text_input("Sandi Baru:", type="password")
-        if st.button("Simpan Password"):
+        if st.button("Update Sandi"):
             st.session_state.users[st.session_state.user_role] = n_pw
             save_users(st.session_state.users)
             st.success("Tersimpan!"); time.sleep(1); st.rerun()
-    if st.button("🚪 KELUAR SISTEM", use_container_width=True):
-        st.session_state.logged_in = False; st.rerun()
-    st.divider()
-    st.markdown("<p class='dev-name'>HARDIANTO</p><p class='ruas-text'>RUAS STUDIO</p>", unsafe_allow_html=True)
+with col_h3:
+    if st.button("🚪 KELUAR", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
+
+st.divider()
 
 # ==========================================
 # 5. DASHBOARD UTAMA
@@ -122,8 +129,6 @@ with st.sidebar:
 df_kas = pd.DataFrame(st.session_state.data_kas)
 if not df_kas.empty and 'Kategori' not in df_kas.columns:
     df_kas['Kategori'] = 'DANA NON-BOS'
-
-st.markdown(teks_marquee, unsafe_allow_html=True)
 
 # --- VIEW KEPALA SEKOLAH / ADMIN ---
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
@@ -133,73 +138,50 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         st.subheader("Aktivitas Staf Hari Ini")
         if st.session_state.live_monitor:
             st.table(pd.DataFrame(st.session_state.live_monitor)[::-1])
-        else: st.info("Belum ada aktivitas tercatat.")
+        else: st.info("Belum ada aktivitas.")
         
     with t2:
-        st.subheader("Arsip Laporan dari Staf")
-        if st.session_state.laporan_masuk:
-            for r in reversed(st.session_state.laporan_masuk):
-                with st.expander(f"Laporan: {r['Dari']} ({r['Jam']})"):
-                    st.write(r['Isi'])
-        else: st.info("Belum ada laporan masuk.")
+        st.subheader("Laporan Masuk")
+        for r in reversed(st.session_state.laporan_masuk):
+            with st.expander(f"Laporan: {r['Dari']} ({r['Jam']})"):
+                st.write(r['Isi'])
             
     with t3:
         target = st.multiselect("Pilih Staf:", [u for u in st.session_state.users.keys() if u != "Kepala Sekolah"])
-        msg = st.text_area("Isi Pesan Instruksi:")
-        if st.button("Kirim Sekarang"):
-            if target and msg:
-                for s in target:
-                    st.session_state.tugas_khusus.append({"Jam": waktu_skrg, "Untuk": s, "Instruksi": msg})
-                save_data(st.session_state.tugas_khusus, "database_tugas.csv")
-                st.success("Instruksi Berhasil Dikirim!"); st.rerun()
-        st.divider()
-        st.subheader("Arsip Instruksi")
-        if st.session_state.tugas_khusus:
-            st.dataframe(pd.DataFrame(st.session_state.tugas_khusus)[::-1], use_container_width=True)
+        msg = st.text_area("Isi Pesan:")
+        if st.button("Kirim Instruksi"):
+            for s in target:
+                st.session_state.tugas_khusus.append({"Jam": waktu_skrg, "Untuk": s, "Instruksi": msg})
+            save_data(st.session_state.tugas_khusus, "database_tugas.csv")
+            st.success("Terkirim!"); st.rerun()
 
     with t4:
-        st.subheader("💰 Jurnal Dana BOS")
-        df_bos = df_kas[df_kas['Kategori'] == 'DANA BOS'] if not df_kas.empty else pd.DataFrame()
-        st.dataframe(df_bos[::-1], use_container_width=True)
-        st.subheader("💵 Jurnal Dana NON-BOS")
-        df_non = df_kas[df_kas['Kategori'] == 'DANA NON-BOS'] if not df_kas.empty else pd.DataFrame()
-        st.dataframe(df_non[::-1], use_container_width=True)
+        st.subheader("BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA BOS'][::-1], use_container_width=True)
+        st.subheader("NON-BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA NON-BOS'][::-1], use_container_width=True)
 
 # --- VIEW STAF ---
 else:
-    ts1, ts2, ts3 = st.tabs(["📝 INPUT KERJA", "🔔 INSTRUKSI KEPSEK", "📚 ARSIP SAYA"])
-    
+    ts1, ts2, ts3 = st.tabs(["📝 INPUT TUGAS", "🔔 INSTRUKSI", "📚 ARSIP"])
     with ts1:
         col_a, col_b = st.columns(2)
         with col_a:
-            st.subheader("Update Aktivitas")
-            act = st.text_area("Kegiatan Anda saat ini:")
-            if st.button("Kirim Aktivitas"):
+            act = st.text_area("Update Aktivitas:")
+            if st.button("Simpan Aktivitas"):
                 st.session_state.live_monitor.append({"Jam": waktu_skrg, "Staf": st.session_state.user_role, "Aktivitas": act})
-                save_data(st.session_state.live_monitor, "database_monitor.csv")
-                st.success("Tersimpan!"); st.rerun()
+                save_data(st.session_state.live_monitor, "database_monitor.csv"); st.rerun()
         with col_b:
-            st.subheader("Kirim Laporan")
-            lap = st.text_area("Laporan Khusus untuk Kepsek:")
+            lap = st.text_area("Laporan ke Kepsek:")
             if st.button("Kirim Laporan"):
                 st.session_state.laporan_masuk.append({"Jam": waktu_skrg, "Dari": st.session_state.user_role, "Isi": lap})
-                save_data(st.session_state.laporan_masuk, "database_laporan.csv")
-                st.success("Laporan Terkirim!"); st.rerun()
+                save_data(st.session_state.laporan_masuk, "database_laporan.csv"); st.rerun()
 
     with ts2:
-        st.subheader("Instruksi Masuk")
-        my_tasks = [t for t in st.session_state.tugas_khusus if t['Untuk'] == st.session_state.user_role]
-        if my_tasks:
-            for t in reversed(my_tasks):
-                st.info(f"[{t['Jam']}] {t['Instruksi']}")
-        else: st.write("Belum ada instruksi baru.")
-
+        for t in reversed(st.session_state.tugas_khusus):
+            if t['Untuk'] == st.session_state.user_role: st.info(f"[{t['Jam']}] {t['Instruksi']}")
     with ts3:
-        st.subheader("Arsip Aktivitas Saya")
         my_data = [a for a in st.session_state.live_monitor if a['Staf'] == st.session_state.user_role]
-        if my_data:
-            st.table(pd.DataFrame(my_data)[::-1])
+        if my_data: st.table(pd.DataFrame(my_data)[::-1])
 
-# Heartbeat Update
+st.markdown(f"<p style='text-align:center; color:grey;'>{st.session_state.user_role} | HARDIANTO - RUAS STUDIO</p>", unsafe_allow_html=True)
 time.sleep(1)
 st.rerun()
