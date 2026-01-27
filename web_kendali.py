@@ -59,8 +59,8 @@ def load_data(filename):
     if os.path.exists(path):
         try:
             df = pd.read_csv(path)
-            if filename == "database_kas.csv" and 'Kategori' not in df.columns:
-                df['Kategori'] = 'DANA NON-BOS'
+            if filename == "database_kas.csv":
+                if 'Kategori' not in df.columns: df['Kategori'] = 'DANA NON-BOS'
             return df.to_dict('records')
         except: return []
     return []
@@ -68,9 +68,7 @@ def load_data(filename):
 # ==========================================
 # 3. SESSION INITIALIZATION
 # ==========================================
-if "users" not in st.session_state:
-    st.session_state.users = load_users()
-
+if "users" not in st.session_state: st.session_state.users = load_users()
 if "logged_in" not in st.session_state:
     st.session_state.update({
         "logged_in": False, "user_role": None,
@@ -83,7 +81,6 @@ if "logged_in" not in st.session_state:
 waktu_skrg = datetime.now().strftime("%H:%M:%S")
 teks_marquee = '<div class="marquee-container"><div class="marquee-text">✨ SMK Nasional Bandung: Kieu Bisa, Kitu Bisa, Sagala Bisa. Sholat Yang Utama ✨</div></div>'
 
-# --- LOGIN PAGE ---
 if not st.session_state.logged_in:
     st.markdown(teks_marquee, unsafe_allow_html=True)
     _, col_log, _ = st.columns([1, 1, 1])
@@ -103,8 +100,6 @@ if not st.session_state.logged_in:
 # 4. HEADER & PENGATURAN (DESAIN AWAL)
 # ==========================================
 st.markdown(teks_marquee, unsafe_allow_html=True)
-
-# Baris Header untuk Jam dan Tombol Logout
 col_h1, col_h2, col_h3 = st.columns([2, 2, 1])
 with col_h1:
     st.markdown(f"<h2 class='digital-clock-main'>{waktu_skrg}</h2>", unsafe_allow_html=True)
@@ -120,31 +115,32 @@ with col_h3:
     if st.button("🚪 KELUAR", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
-
 st.divider()
 
 # ==========================================
-# 5. DASHBOARD UTAMA
+# 5. DATA PROCESSING (PROTECTED)
 # ==========================================
 df_kas = pd.DataFrame(st.session_state.data_kas)
-if not df_kas.empty and 'Kategori' not in df_kas.columns:
-    df_kas['Kategori'] = 'DANA NON-BOS'
+# Cek proteksi kolom kategori kembali sebelum render
+if not df_kas.empty:
+    if 'Kategori' not in df_kas.columns:
+        df_kas['Kategori'] = 'DANA NON-BOS'
 
-# --- VIEW KEPALA SEKOLAH / ADMIN ---
+# ==========================================
+# 6. DASHBOARD CONTENT
+# ==========================================
 if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
     t1, t2, t3, t4 = st.tabs(["🎥 MONITOR LIVE", "📁 ARSIP LAPORAN", "✍️ KIRIM INSTRUKSI", "💰 KEUANGAN"])
     
     with t1:
         st.subheader("Aktivitas Staf Hari Ini")
-        if st.session_state.live_monitor:
-            st.table(pd.DataFrame(st.session_state.live_monitor)[::-1])
+        if st.session_state.live_monitor: st.table(pd.DataFrame(st.session_state.live_monitor)[::-1])
         else: st.info("Belum ada aktivitas.")
         
     with t2:
         st.subheader("Laporan Masuk")
         for r in reversed(st.session_state.laporan_masuk):
-            with st.expander(f"Laporan: {r['Dari']} ({r['Jam']})"):
-                st.write(r['Isi'])
+            with st.expander(f"Laporan: {r['Dari']} ({r['Jam']})"): st.write(r['Isi'])
             
     with t3:
         target = st.multiselect("Pilih Staf:", [u for u in st.session_state.users.keys() if u != "Kepala Sekolah"])
@@ -152,24 +148,36 @@ if st.session_state.user_role in ["Kepala Sekolah", "ADMIN SISTEM"]:
         if st.button("Kirim Instruksi"):
             for s in target:
                 st.session_state.tugas_khusus.append({"Jam": waktu_skrg, "Untuk": s, "Instruksi": msg})
-            save_data(st.session_state.tugas_khusus, "database_tugas.csv")
-            st.success("Terkirim!"); st.rerun()
+            save_data(st.session_state.tugas_khusus, "database_tugas.csv"); st.success("Terkirim!"); st.rerun()
 
     with t4:
-        st.subheader("BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA BOS'][::-1], use_container_width=True)
-        st.subheader("NON-BOS"); st.dataframe(df_kas[df_kas['Kategori']=='DANA NON-BOS'][::-1], use_container_width=True)
+        if not df_kas.empty:
+            st.subheader("BOS")
+            st.dataframe(df_kas[df_kas['Kategori']=='DANA BOS'][::-1], use_container_width=True)
+            st.subheader("NON-BOS")
+            st.dataframe(df_kas[df_kas['Kategori']=='DANA NON-BOS'][::-1], use_container_width=True)
+        else: st.info("Belum ada data keuangan.")
 
-# --- VIEW STAF ---
 else:
     ts1, ts2, ts3 = st.tabs(["📝 INPUT TUGAS", "🔔 INSTRUKSI", "📚 ARSIP"])
     with ts1:
-        col_a, col_b = st.columns(2)
-        with col_a:
+        if "Bendahara" in st.session_state.user_role:
+            with st.form("f_kas"):
+                kat = st.radio("Kategori:", ["DANA BOS", "DANA NON-BOS"], horizontal=True)
+                tipe = st.selectbox("Jenis:", ["Masuk", "Keluar"])
+                nom = st.number_input("Nominal:", min_value=0)
+                ket = st.text_input("Keterangan:")
+                if st.form_submit_button("Simpan Transaksi"):
+                    st.session_state.data_kas.append({"Waktu": waktu_skrg, "Kategori": kat, "Masuk": nom if tipe=="Masuk" else 0, "Keluar": nom if tipe=="Keluar" else 0, "Keterangan": ket})
+                    save_data(st.session_state.data_kas, "database_kas.csv"); st.rerun()
+        
+        ca, cb = st.columns(2)
+        with ca:
             act = st.text_area("Update Aktivitas:")
             if st.button("Simpan Aktivitas"):
                 st.session_state.live_monitor.append({"Jam": waktu_skrg, "Staf": st.session_state.user_role, "Aktivitas": act})
                 save_data(st.session_state.live_monitor, "database_monitor.csv"); st.rerun()
-        with col_b:
+        with cb:
             lap = st.text_area("Laporan ke Kepsek:")
             if st.button("Kirim Laporan"):
                 st.session_state.laporan_masuk.append({"Jam": waktu_skrg, "Dari": st.session_state.user_role, "Isi": lap})
